@@ -25,6 +25,7 @@ export type ColorsType = {
   linearGradient: [string, string, ...string[]];
   downGradient: string;
   upGradient: string;
+  tabIconNonActive: string;
 };
 
 export const colorsConfig: Record<ThemeType, ColorsType> = {
@@ -50,6 +51,7 @@ export const colorsConfig: Record<ThemeType, ColorsType> = {
     linearGradient: ['#1B4D3E', '#2E8B6E'],
     downGradient: '#2E8B6E',
     upGradient: '#1B4D3E',
+    tabIconNonActive: '#F8F9FA',
   },
   dark: {
     theme: 'dark',
@@ -73,6 +75,7 @@ export const colorsConfig: Record<ThemeType, ColorsType> = {
     linearGradient: ['#0A1A12', '#132F1F'],
     downGradient: '#132F1F',
     upGradient: '#0A1A12',
+    tabIconNonActive: '#8B949E',
   },
 };
 

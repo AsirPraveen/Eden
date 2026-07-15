@@ -17,6 +17,7 @@ import { Building2, MapPin, Phone, FileText, Plus, ArrowLeft, LogOut, ChevronRig
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
 import { useClinic } from '../../context/ClinicContext';
+import { cleanDoctorName } from '../../utils/helpers';
 
 export default function ClinicSelectionScreen({ navigation }: any) {
   const { colors } = useTheme();
@@ -81,7 +82,7 @@ export default function ClinicSelectionScreen({ navigation }: any) {
           {/* Header */}
           <View style={styles.header}>
             <Text style={styles.greeting}>
-              Welcome, {profile?.name?.split(' ')[0] || 'Doctor'}
+              Welcome, {cleanDoctorName(profile?.name).split(' ')[0] || 'Doctor'}
             </Text>
             <Text style={styles.headerSub}>
               {hasClinics

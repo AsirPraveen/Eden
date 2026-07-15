@@ -20,6 +20,7 @@ import HomeTabsNavigation from './TabNavigator';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { useClinic } from '../context/ClinicContext';
+import { cleanDoctorName } from '../utils/helpers';
 
 const Drawer = createDrawerNavigator();
 
@@ -35,7 +36,7 @@ const CustomDrawerContent = (props: any) => {
         <View style={drawerStyles.userHeader}>
           <View style={drawerStyles.userAvatar}>
             <Text style={drawerStyles.userInitial}>
-              {profile?.name?.charAt(0)?.toUpperCase() || 'D'}
+              {cleanDoctorName(profile?.name).charAt(0).toUpperCase() || 'D'}
             </Text>
           </View>
           <Text style={[drawerStyles.userName, { color: colors.textLight }]}>

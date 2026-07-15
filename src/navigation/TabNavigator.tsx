@@ -32,19 +32,19 @@ type TabIconProps = {
 const TabIcons: Record<string, (props: TabIconProps) => React.ReactNode> = {
   Home: ({ active }) => {
     const { colors } = useTheme();
-    return <LayoutDashboard size={24} color={active ? colors.upGradient : colors.textSecondary} strokeWidth={active ? 2.2 : 1.8} />;
+    return <LayoutDashboard size={24} color={active ? colors.upGradient : colors.tabIconNonActive} strokeWidth={active ? 2.2 : 1.8} />;
   },
   Inventory: ({ active }) => {
     const { colors } = useTheme();
-    return <Package size={24} color={active ? colors.upGradient : colors.textSecondary} strokeWidth={active ? 2.2 : 1.8} />;
+    return <Package size={24} color={active ? colors.upGradient : colors.tabIconNonActive} strokeWidth={active ? 2.2 : 1.8} />;
   },
   Reps: ({ active }) => {
     const { colors } = useTheme();
-    return <Handshake size={24} color={active ? colors.upGradient : colors.textSecondary} strokeWidth={active ? 2.2 : 1.8} />;
+    return <Handshake size={24} color={active ? colors.upGradient : colors.tabIconNonActive} strokeWidth={active ? 2.2 : 1.8} />;
   },
   Profile: ({ active }) => {
     const { colors } = useTheme();
-    return <UserCircle size={24} color={active ? colors.upGradient : colors.textSecondary} strokeWidth={active ? 2.2 : 1.8} />;
+    return <UserCircle size={24} color={active ? colors.upGradient : colors.tabIconNonActive} strokeWidth={active ? 2.2 : 1.8} />;
   },
 };
 
@@ -138,7 +138,7 @@ const AnimatedTabBar = ({
   }));
 
   return (
-    <View style={[styles.tabBar, { height: 60 + bottom, backgroundColor: colors.background }]}>
+    <View style={[styles.tabBar, { height: 60 + bottom, backgroundColor: colors.primary }]}>
       <AnimatedSvg
         width={110}
         height={60}
@@ -146,7 +146,7 @@ const AnimatedTabBar = ({
         style={[styles.activeBackground, animatedStyles]}
       >
         <Path
-          fill={colors.downGradient}
+          fill={colors.background}
           d="M20 0H0c11.046 0 20 8.953 20 20v5c0 19.33 15.67 35 35 35s35-15.67 35-35v-5c0-11.045 8.954-20 20-20H20z"
         />
       </AnimatedSvg>
@@ -184,7 +184,7 @@ const TabBarComponent = ({ active, options, onLayout, onPress }: any) => {
   return (
     <Pressable onPress={onPress} onLayout={onLayout} style={styles.component}>
       <Animated.View
-        style={[styles.componentCircle, animatedCircle, { backgroundColor: colors.background }]}
+        style={[styles.componentCircle, animatedCircle, { backgroundColor: colors.secondary }]}
       />
       <Animated.View style={[styles.iconContainer, animatedIcon]}>
         {options.tabBarIcon ? options.tabBarIcon({ focused: active }) : null}

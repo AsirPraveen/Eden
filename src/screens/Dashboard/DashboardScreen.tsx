@@ -25,7 +25,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useClinic } from '../../context/ClinicContext';
 import StatsCard from '../../components/StatsCard';
 import CountdownBadge from '../../components/CountdownBadge';
-import { getGreeting, formatCurrency } from '../../utils/helpers';
+import { getGreeting, formatCurrency, cleanDoctorName } from '../../utils/helpers';
 import {
   collection,
   query,
@@ -152,7 +152,7 @@ export default function DashboardScreen() {
   };
 
   const greeting = getGreeting();
-  const firstName = profile?.name?.split(' ')[0] || 'Doctor';
+  const firstName = cleanDoctorName(profile?.name).split(' ')[0] || 'Doctor';
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>

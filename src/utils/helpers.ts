@@ -129,10 +129,6 @@ export const getGreeting = (): string => {
   return 'Good Evening';
 };
 
-/**
- * Parse dosage string to morning/afternoon/night counts
- * e.g., "1-0-1" → { morning: 1, afternoon: 0, night: 1 }
- */
 export const parseDosage = (dosage: string): { morning: number; afternoon: number; night: number } => {
   const parts = dosage.split('-').map(Number);
   return {
@@ -140,4 +136,12 @@ export const parseDosage = (dosage: string): { morning: number; afternoon: numbe
     afternoon: parts[1] || 0,
     night: parts[2] || 0,
   };
+};
+
+/**
+ * Clean "Dr." or "Dr" or "Doctor" prefix from a name
+ */
+export const cleanDoctorName = (name?: string): string => {
+  if (!name) return '';
+  return name.replace(/^(dr\.|dr\b|doctor\b)\s*/i, '').trim();
 };

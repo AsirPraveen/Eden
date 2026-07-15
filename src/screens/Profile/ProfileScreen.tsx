@@ -12,7 +12,7 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
 import { useClinic } from '../../context/ClinicContext';
-import { formatCurrency, toDate } from '../../utils/helpers';
+import { formatCurrency, toDate, cleanDoctorName } from '../../utils/helpers';
 import {
   collection, getDocs, query, where, orderBy, limit,
 } from 'firebase/firestore';
@@ -142,7 +142,7 @@ export default function ProfileScreen() {
           <View style={styles.profileCard}>
             <View style={styles.avatarContainer}>
               <Text style={styles.avatarText}>
-                {profile?.name?.charAt(0)?.toUpperCase() || 'D'}
+                {cleanDoctorName(profile?.name).charAt(0).toUpperCase() || 'D'}
               </Text>
             </View>
             <Text style={styles.profileName}>{profile?.name || 'Doctor'}</Text>

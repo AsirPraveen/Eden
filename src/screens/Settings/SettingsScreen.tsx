@@ -14,6 +14,7 @@ import { useClinic } from '../../context/ClinicContext';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import { cancelAllNotifications } from '../../services/NotificationService';
+import { cleanDoctorName } from '../../utils/helpers';
 
 export default function SettingsScreen() {
   const navigation = useNavigation<any>();
@@ -146,7 +147,7 @@ export default function SettingsScreen() {
         <View style={[styles.profileCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <View style={[styles.avatar, { backgroundColor: colors.secondary + '15' }]}>
             <Text style={[styles.avatarText, { color: colors.secondary }]}>
-              {profile?.name?.charAt(0)?.toUpperCase() || 'D'}
+              {cleanDoctorName(profile?.name).charAt(0).toUpperCase() || 'D'}
             </Text>
           </View>
           <View style={styles.profileInfo}>
