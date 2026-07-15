@@ -8,22 +8,30 @@ import Constants from 'expo-constants';
 const extra = Constants.expoConfig?.extra ?? {};
 
 const firebaseConfig = {
-  apiKey: extra.firebaseApiKey,
-  authDomain: extra.firebaseAuthDomain,
-  projectId: extra.firebaseProjectId,
-  storageBucket: extra.firebaseStorageBucket,
-  messagingSenderId: extra.firebaseMessagingSenderId,
-  appId: extra.firebaseAppId,
+  apiKey: extra.firebaseApiKey || process.env.FIREBASE_API_KEY || '',
+  authDomain: extra.firebaseAuthDomain || process.env.FIREBASE_AUTH_DOMAIN || '',
+  projectId: extra.firebaseProjectId || process.env.FIREBASE_PROJECT_ID || '',
+  storageBucket: extra.firebaseStorageBucket || process.env.FIREBASE_STORAGE_BUCKET || '',
+  messagingSenderId: extra.firebaseMessagingSenderId || process.env.FIREBASE_MESSAGING_SENDER_ID || '',
+  appId: extra.firebaseAppId || process.env.FIREBASE_APP_ID || '',
 };
 
-const app = initializeApp(firebaseConfig);
+let app: any;
+let auth: any;
+let db: any;
 
-// Firebase Auth with AsyncStorage persistence (for React Native)
-export const auth = initializeAuth(app, {
-  persistence: getReactNativePersistence(AsyncStorage),
-});
+try {
+  if (!firebaseConfig.apiKey) {
+    console.warn('⚠️ Firebase API key is missing. Check your .env file.');
+  }
+  app = initializeApp(firebaseConfig);
+  auth = initializeAuth(app, {
+    persistence: getReactNativePersistence(AsyncStorage),
+  });
+  db = getFirestore(app);
+} catch (error) {
+  console.error('❌ Error initializing Firebase:', error);
+}
 
-// Firestore with offline persistence enabled by default on mobile
-export const db = getFirestore(app);
-
+export { auth, db };
 export default app;

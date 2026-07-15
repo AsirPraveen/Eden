@@ -38,12 +38,19 @@ export default function RepDetailsScreen({ navigation, route }: any) {
 
       const entryQ = query(
         collection(db, 'clinics', clinicId, 'stockEntries'),
-        where('repId', '==', repId),
-        orderBy('createdAt', 'desc')
+        where('repId', '==', repId)
       );
       const entrySnap = await getDocs(entryQ);
       const entries: any[] = [];
       entrySnap.forEach((d) => entries.push({ id: d.id, ...d.data() }));
+
+      // Sort in memory by createdAt desc
+      entries.sort((a, b) => {
+        const dateA = a.createdAt?.seconds ? a.createdAt.seconds * 1000 : new Date(a.createdAt).getTime();
+        const dateB = b.createdAt?.seconds ? b.createdAt.seconds * 1000 : new Date(b.createdAt).getTime();
+        return dateB - dateA;
+      });
+
       setStockEntries(entries);
     } catch (err) {
       console.error('Error:', err);

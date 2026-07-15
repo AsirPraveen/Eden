@@ -42,12 +42,19 @@ export default function MedicineDetailsScreen({ navigation, route }: any) {
       // Fetch stock entries for this medicine
       const stockQ = query(
         collection(db, 'clinics', clinicId, 'stockEntries'),
-        where('medicineId', '==', medicineId),
-        orderBy('createdAt', 'desc')
+        where('medicineId', '==', medicineId)
       );
       const stockSnap = await getDocs(stockQ);
       const history: any[] = [];
       stockSnap.forEach((d) => history.push({ id: d.id, ...d.data() }));
+
+      // Sort in memory by createdAt desc
+      history.sort((a, b) => {
+        const dateA = a.createdAt?.seconds ? a.createdAt.seconds * 1000 : new Date(a.createdAt).getTime();
+        const dateB = b.createdAt?.seconds ? b.createdAt.seconds * 1000 : new Date(b.createdAt).getTime();
+        return dateB - dateA;
+      });
+
       setStockHistory(history);
     } catch (err) {
       console.error('Error fetching medicine details:', err);

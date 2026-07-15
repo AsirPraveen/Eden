@@ -7,7 +7,7 @@ export default {
     icon: "./assets/icon.png",
     scheme: "eden",
     userInterfaceStyle: "automatic",
-    newArchEnabled: true,
+    newArchEnabled: false,
     ios: {
       supportsTablet: true,
     },

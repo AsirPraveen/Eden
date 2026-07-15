@@ -16,6 +16,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Mail, Lock, Eye, EyeOff } from 'lucide-react-native';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
+import { auth, db } from '../../config/firebase';
+import { doc, getDoc } from 'firebase/firestore';
 
 export default function LoginScreen({ navigation }: any) {
   const { colors } = useTheme();
@@ -35,7 +37,35 @@ export default function LoginScreen({ navigation }: any) {
     try {
       setLoading(true);
       await login(email.trim(), password);
-      // Auth state change will trigger navigation
+      
+      const currentUser = auth.currentUser;
+      if (currentUser) {
+        const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
+        if (userDoc.exists()) {
+          const profileData = userDoc.data();
+          if (profileData.clinicIds && profileData.clinicIds.length > 0 && profileData.activeClinicId) {
+            navigation.reset({
+              index: 0,
+              routes: [{ name: 'MainApp' }],
+            });
+          } else {
+            navigation.reset({
+              index: 0,
+              routes: [{ name: 'ClinicSelection' }],
+            });
+          }
+        } else {
+          navigation.reset({
+            index: 0,
+            routes: [{ name: 'ClinicSelection' }],
+          });
+        }
+      } else {
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'ClinicSelection' }],
+        });
+      }
     } catch (error: any) {
       let message = 'Login failed. Please try again.';
       if (error.code === 'auth/user-not-found') {

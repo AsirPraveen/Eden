@@ -61,8 +61,7 @@ export default function PaymentTrackerScreen({ navigation }: any) {
       } else {
         q = query(
           collection(db, 'clinics', activeClinic.id, 'stockEntries'),
-          where('paymentStatus', '==', filter),
-          orderBy('paymentDueDate', 'asc')
+          where('paymentStatus', '==', filter)
         );
       }
       const snap = await getDocs(q);
@@ -82,6 +81,14 @@ export default function PaymentTrackerScreen({ navigation }: any) {
           createdAt: data.createdAt,
         });
       });
+
+      if (filter !== 'all') {
+        list.sort((a, b) => {
+          const dateA = a.paymentDueDate?.seconds ? a.paymentDueDate.seconds * 1000 : new Date(a.paymentDueDate).getTime();
+          const dateB = b.paymentDueDate?.seconds ? b.paymentDueDate.seconds * 1000 : new Date(b.paymentDueDate).getTime();
+          return dateA - dateB;
+        });
+      }
       setEntries(list);
     } catch (err) {
       console.error('Error fetching payment entries:', err);

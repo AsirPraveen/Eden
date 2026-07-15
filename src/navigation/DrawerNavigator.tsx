@@ -14,8 +14,7 @@ import {
   Users,
   FileText,
 } from 'lucide-react-native';
-import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
-import Ionicons from 'react-native-vector-icons/Ionicons';
+import { MaterialCommunityIcons as Icon, Ionicons } from '@expo/vector-icons';
 
 import HomeTabsNavigation from './TabNavigator';
 import { useAuth } from '../context/AuthContext';
@@ -149,7 +148,7 @@ const CustomDrawerContent = (props: any) => {
 const DrawerNavigator = () => {
   const { colors } = useTheme();
 
-  const drawerIcon = ({ focused, size }: any, name: string) => (
+  const drawerIcon = ({ focused, size }: any, name: any) => (
     <Icon name={name} size={size} color={focused ? colors.secondary : colors.textLight} />
   );
 

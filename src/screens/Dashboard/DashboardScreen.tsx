@@ -104,8 +104,7 @@ export default function DashboardScreen() {
       // Fetch outstanding payments (stock entries with unpaid/partial status)
       const paymentQuery = query(
         collection(db, 'clinics', clinicId, 'stockEntries'),
-        where('paymentStatus', 'in', ['unpaid', 'partial']),
-        orderBy('paymentDueDate', 'asc')
+        where('paymentStatus', 'in', ['unpaid', 'partial'])
       );
       const paySnap = await getDocs(paymentQuery);
       let totalOutstanding = 0;
@@ -119,6 +118,13 @@ export default function DashboardScreen() {
           ...data,
           remaining,
         });
+      });
+
+      // Sort in memory by paymentDueDate asc
+      urgent.sort((a, b) => {
+        const dateA = a.paymentDueDate?.seconds ? a.paymentDueDate.seconds * 1000 : new Date(a.paymentDueDate).getTime();
+        const dateB = b.paymentDueDate?.seconds ? b.paymentDueDate.seconds * 1000 : new Date(b.paymentDueDate).getTime();
+        return dateA - dateB;
       });
 
       setStats({

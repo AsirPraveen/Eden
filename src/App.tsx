@@ -3,10 +3,10 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { NavigationContainer, createNavigationContainerRef } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import { ThemeProvider, useTheme } from '../context/ThemeContext';
-import { AuthProvider } from '../context/AuthContext';
-import { ClinicProvider } from '../context/ClinicContext';
-import StackNavigation from '../navigation/StackNavigation';
+import { ThemeProvider, useTheme } from './context/ThemeContext';
+import { AuthProvider } from './context/AuthContext';
+import { ClinicProvider } from './context/ClinicContext';
+import StackNavigation from './navigation/StackNavigation';
 
 export const navigationRef = createNavigationContainerRef();
 

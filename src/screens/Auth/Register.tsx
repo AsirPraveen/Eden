@@ -47,7 +47,11 @@ export default function RegisterScreen({ navigation }: any) {
     try {
       setLoading(true);
       await register(email.trim(), password, name.trim(), phone.trim(), licenseNo.trim());
-      // Auth state change will trigger navigation
+      
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'ClinicSelection' }],
+      });
     } catch (error: any) {
       let message = 'Registration failed. Please try again.';
       if (error.code === 'auth/email-already-in-use') {

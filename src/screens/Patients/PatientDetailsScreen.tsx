@@ -37,12 +37,19 @@ export default function PatientDetailsScreen({ navigation, route }: any) {
 
       const rxQ = query(
         collection(db, 'clinics', clinicId, 'prescriptions'),
-        where('patientId', '==', patientId),
-        orderBy('createdAt', 'desc')
+        where('patientId', '==', patientId)
       );
       const rxSnap = await getDocs(rxQ);
       const rxList: any[] = [];
       rxSnap.forEach((d) => rxList.push({ id: d.id, ...d.data() }));
+
+      // Sort in memory by createdAt desc
+      rxList.sort((a, b) => {
+        const dateA = a.createdAt?.seconds ? a.createdAt.seconds * 1000 : new Date(a.createdAt).getTime();
+        const dateB = b.createdAt?.seconds ? b.createdAt.seconds * 1000 : new Date(b.createdAt).getTime();
+        return dateB - dateA;
+      });
+
       setPrescriptions(rxList);
     } catch (err) {
       console.error('Error fetching patient details:', err);

@@ -6,7 +6,7 @@ import Svg, { Path } from 'react-native-svg';
 import Animated, {
   useAnimatedStyle,
   withTiming,
-  useDerivedValue,
+  useSharedValue,
 } from 'react-native-reanimated';
 import {
   LayoutDashboard,
@@ -122,10 +122,16 @@ const AnimatedTabBar = ({
     }
   };
 
-  const xOffset = useDerivedValue(() => {
-    if (layout.length !== routes.length) return 0;
-    return [...layout].find(({ index }: any) => index === activeIndex)?.x - 25;
-  }, [activeIndex, layout]);
+  const xOffset = useSharedValue(0);
+
+  useEffect(() => {
+    if (layout.length === routes.length) {
+      const activeLayout = layout.find((item: any) => item.index === activeIndex);
+      if (activeLayout) {
+        xOffset.value = activeLayout.x - 25;
+      }
+    }
+  }, [activeIndex, layout, routes.length]);
 
   const animatedStyles = useAnimatedStyle(() => ({
     transform: [{ translateX: withTiming(xOffset.value, { duration: 250 }) }],
