@@ -8,6 +8,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { useClinic } from '../../context/ClinicContext';
 import { formatCurrency, formatDateTime, toDate } from '../../utils/helpers';
 import { printPrescription } from '../../services/PrintService';
+import { SignaturePreview } from '../../components/SignaturePad';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 
@@ -101,6 +102,11 @@ export default function PrescriptionDetailScreen({ navigation, route }: any) {
           <Text style={[styles.doctorText, { color: colors.textSecondary }]}>
             Dr. {rx.doctorName}
           </Text>
+          {rx.signatureData ? (
+            <View style={{ marginTop: 8, alignItems: 'center' }}>
+              <SignaturePreview pathData={rx.signatureData} height={50} width={200} />
+            </View>
+          ) : null}
         </View>
 
         {/* Medicines Table */}

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  View, Text, FlatList, TouchableOpacity, StyleSheet, RefreshControl,
+  View, Text, FlatList, TouchableOpacity, StyleSheet, RefreshControl, Linking, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -120,10 +120,17 @@ export default function RepsScreen() {
               <Text style={[styles.meta, { color: colors.textSecondary }]}>{item.company}</Text>
             </View>
             {item.phone ? (
-              <View style={styles.metaRow}>
-                <Phone size={11} color={colors.textSecondary} />
-                <Text style={[styles.meta, { color: colors.textSecondary }]}>{item.phone}</Text>
-              </View>
+              <TouchableOpacity
+                style={styles.metaRow}
+                onPress={() => {
+                  const url = Platform.OS === 'ios' ? `telprompt:${item.phone}` : `tel:${item.phone}`;
+                  Linking.openURL(url).catch(() => {});
+                }}
+                activeOpacity={0.6}
+              >
+                <Phone size={11} color={colors.secondary} />
+                <Text style={[styles.meta, { color: colors.secondary, textDecorationLine: 'underline' }]}>{item.phone}</Text>
+              </TouchableOpacity>
             ) : null}
             {item.visitDay ? (
               <Text style={[styles.visitDay, { color: colors.secondary }]}>

@@ -8,6 +8,7 @@ export type UserProfile = {
   email: string;
   phone?: string;
   licenseNo?: string;
+  signatureData?: string; // SVG path data for doctor signature
   clinicIds: string[];
   activeClinicId: string | null;
   createdAt: Date;

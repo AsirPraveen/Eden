@@ -1,5 +1,6 @@
 import React from 'react';
-import { createStackNavigator } from '@react-navigation/stack';
+import { Easing } from 'react-native';
+import { createStackNavigator, CardStyleInterpolators, TransitionSpecs } from '@react-navigation/stack';
 
 import OnboardingScreen from '../screens/InitialScreen/OnboardingScreen';
 import LoginScreen from '../screens/Auth/Login';
@@ -36,9 +37,37 @@ import SettingsScreen from '../screens/Settings/SettingsScreen';
 
 const Stack = createStackNavigator();
 
+// Smooth spring-based transition for buttery screen changes
+const smoothTransition = {
+  open: {
+    animation: 'timing' as const,
+    config: {
+      duration: 300,
+      easing: Easing.out(Easing.poly(4)),
+    },
+  },
+  close: {
+    animation: 'timing' as const,
+    config: {
+      duration: 250,
+      easing: Easing.in(Easing.poly(4)),
+    },
+  },
+};
+
 const StackNavigation = () => {
   return (
-    <Stack.Navigator initialRouteName="Onboarding">
+    <Stack.Navigator
+      initialRouteName="Onboarding"
+      screenOptions={{
+        headerShown: false,
+        cardStyleInterpolator: CardStyleInterpolators.forHorizontalIOS,
+        transitionSpec: smoothTransition,
+        gestureEnabled: true,
+        gestureDirection: 'horizontal',
+        cardStyle: { backgroundColor: 'transparent' },
+      }}
+    >
       {/* Auth Flow */}
       <Stack.Screen
         name="Onboarding"

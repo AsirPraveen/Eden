@@ -1,17 +1,20 @@
 import React, { useEffect, useReducer, useRef, useState } from 'react';
-import { Pressable, StyleSheet, View, Keyboard } from 'react-native';
+import { Pressable, StyleSheet, View, Keyboard, TouchableOpacity, Platform } from 'react-native';
 import { createBottomTabNavigator, BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
 import Svg, { Path } from 'react-native-svg';
+import { LinearGradient } from 'expo-linear-gradient';
 import Animated, {
   useAnimatedStyle,
   withTiming,
+  withSpring,
   useSharedValue,
 } from 'react-native-reanimated';
 import {
   LayoutDashboard,
   Package,
-  FileText,
+  FilePlus2,
   Handshake,
   UserCircle,
 } from 'lucide-react-native';
@@ -24,6 +27,11 @@ import { useTheme } from '../context/ThemeContext';
 
 const Tab = createBottomTabNavigator();
 const AnimatedSvg = Animated.createAnimatedComponent(Svg);
+
+// Dummy component for the FAB tab (never actually rendered)
+function PrescribePlaceholder() {
+  return <View />;
+}
 
 type TabIconProps = {
   active: boolean;
@@ -72,6 +80,21 @@ const HomeTabsNavigation = () => {
         }}
       />
       <Tab.Screen
+        name="Prescribe"
+        component={PrescribePlaceholder}
+        options={{
+          tabBarIcon: () => null,
+        }}
+        listeners={({ navigation }) => ({
+          tabPress: (e) => {
+            // Prevent navigating to the placeholder screen
+            e.preventDefault();
+            // Navigate to the PrescriptionForm in the parent stack
+            navigation.navigate('PrescriptionForm');
+          },
+        })}
+      />
+      <Tab.Screen
         name="Reps"
         component={RepsScreen}
         options={{
@@ -89,7 +112,7 @@ const HomeTabsNavigation = () => {
   );
 };
 
-// Animated tab bar — same SVG bubble pattern from Bible app
+// Animated tab bar with center FAB
 const AnimatedTabBar = ({
   state: { index: activeIndex, routes },
   navigation,
@@ -107,7 +130,7 @@ const AnimatedTabBar = ({
     }
     return [...state, { x: action.x, index: action.index }];
   };
-  const [layout, dispatch] = useReducer(reducer, []);
+  const [layoutData, dispatch] = useReducer(reducer, []);
 
   const [keyboardVisible, setKeyboardVisible] = useState(false);
   useEffect(() => {
@@ -124,14 +147,19 @@ const AnimatedTabBar = ({
 
   const xOffset = useSharedValue(0);
 
+  // Map actual active index to visual index (skip center FAB at index 2)
+  const visualActiveIndex = activeIndex > 2 ? activeIndex : activeIndex;
+
   useEffect(() => {
-    if (layout.length === routes.length) {
-      const activeLayout = layout.find((item: any) => item.index === activeIndex);
+    // Don't move bubble to the FAB position (index 2)
+    if (activeIndex === 2) return;
+    if (layoutData.length === routes.length) {
+      const activeLayout = layoutData.find((item: any) => item.index === activeIndex);
       if (activeLayout) {
         xOffset.value = activeLayout.x - 25;
       }
     }
-  }, [activeIndex, layout, routes.length]);
+  }, [activeIndex, layoutData, routes.length]);
 
   const animatedStyles = useAnimatedStyle(() => ({
     transform: [{ translateX: withTiming(xOffset.value, { duration: 250 }) }],
@@ -155,6 +183,19 @@ const AnimatedTabBar = ({
         {routes.map((route, index) => {
           const active = index === activeIndex;
           const { options } = descriptors[route.key];
+          const isFab = index === 2; // Center position is FAB
+
+          if (isFab) {
+            return (
+              <FABButton
+                key={route.key}
+                onPress={() => navigation.navigate('PrescriptionForm' as any)}
+                onLayout={(e: any) => handleLayout(e, index)}
+                colors={colors}
+              />
+            );
+          }
+
           return (
             <TabBarComponent
               key={route.key}
@@ -166,6 +207,38 @@ const AnimatedTabBar = ({
           );
         })}
       </View>
+    </View>
+  );
+};
+
+// Center FAB button
+const FABButton = ({ onPress, onLayout, colors }: any) => {
+  const scale = useSharedValue(1);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: withSpring(scale.value) }],
+  }));
+
+  return (
+    <View style={styles.fabWrapper} onLayout={onLayout}>
+      <Animated.View style={animatedStyle}>
+        <TouchableOpacity
+          onPress={onPress}
+          onPressIn={() => { scale.value = 0.9; }}
+          onPressOut={() => { scale.value = 1; }}
+          activeOpacity={0.9}
+          style={styles.fabTouchable}
+        >
+          <LinearGradient
+            colors={[colors.secondary, colors.accent || colors.secondary]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.fabGradient}
+          >
+            <FilePlus2 size={26} color="#fff" strokeWidth={2.2} />
+          </LinearGradient>
+        </TouchableOpacity>
+      </Animated.View>
     </View>
   );
 };
@@ -205,6 +278,37 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  // FAB styles
+  fabWrapper: {
+    width: 60,
+    height: 60,
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    marginTop: -28, // Elevate above tab bar
+  },
+  fabTouchable: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.3,
+        shadowRadius: 10,
+      },
+      android: {
+        elevation: 12,
+      },
+    }),
+  },
+  fabGradient: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
     justifyContent: 'center',
     alignItems: 'center',
   },

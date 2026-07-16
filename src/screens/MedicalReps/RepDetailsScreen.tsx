@@ -1,19 +1,20 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  Alert, RefreshControl, FlatList,
+  Alert, RefreshControl, Linking, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import {
   ArrowLeft, Handshake, Phone, Mail, Calendar, Trash2,
-  CreditCard, ChevronRight, FileText,
+  CreditCard, Plus, FileText,
 } from 'lucide-react-native';
 import { useTheme } from '../../context/ThemeContext';
 import { useClinic } from '../../context/ClinicContext';
 import { formatCurrency, formatDate, toDate } from '../../utils/helpers';
 import CountdownBadge from '../../components/CountdownBadge';
 import {
-  doc, getDoc, deleteDoc, collection, query, where, getDocs, orderBy,
+  doc, getDoc, deleteDoc, collection, query, where, getDocs,
 } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 
@@ -80,6 +81,33 @@ export default function RepDetailsScreen({ navigation, route }: any) {
     ]);
   };
 
+  const handleCallRep = () => {
+    if (rep?.phone) {
+      const url = Platform.OS === 'ios'
+        ? `telprompt:${rep.phone}`
+        : `tel:${rep.phone}`;
+      Linking.openURL(url).catch(() =>
+        Alert.alert('Error', 'Unable to open phone dialer.')
+      );
+    }
+  };
+
+  const handleEmailRep = () => {
+    if (rep?.email) {
+      Linking.openURL(`mailto:${rep.email}`).catch(() =>
+        Alert.alert('Error', 'Unable to open email app.')
+      );
+    }
+  };
+
+  const handleAddStock = () => {
+    navigation.navigate('StockEntry', {
+      repId: rep.id,
+      repName: rep.name,
+      companyName: rep.company,
+    });
+  };
+
   if (!rep) return null;
 
   const totalPurchased = stockEntries.reduce((s, e) => s + (e.totalAmount || 0), 0);
@@ -111,27 +139,53 @@ export default function RepDetailsScreen({ navigation, route }: any) {
           <Text style={[styles.repName, { color: colors.text }]}>{rep.name}</Text>
           <Text style={[styles.company, { color: colors.secondary }]}>{rep.company}</Text>
 
-          <View style={styles.contactRow}>
+          {/* Contact Actions */}
+          <View style={styles.contactActions}>
             {rep.phone ? (
-              <View style={styles.contactItem}>
-                <Phone size={13} color={colors.textSecondary} />
-                <Text style={[styles.contactText, { color: colors.text }]}>{rep.phone}</Text>
-              </View>
+              <TouchableOpacity
+                style={[styles.contactPill, { backgroundColor: colors.success + '15' }]}
+                onPress={handleCallRep}
+                activeOpacity={0.7}
+              >
+                <Phone size={15} color={colors.success} />
+                <Text style={[styles.contactPillText, { color: colors.success }]}>{rep.phone}</Text>
+              </TouchableOpacity>
             ) : null}
             {rep.email ? (
-              <View style={styles.contactItem}>
-                <Mail size={13} color={colors.textSecondary} />
-                <Text style={[styles.contactText, { color: colors.text }]}>{rep.email}</Text>
-              </View>
+              <TouchableOpacity
+                style={[styles.contactPill, { backgroundColor: colors.tint + '15' }]}
+                onPress={handleEmailRep}
+                activeOpacity={0.7}
+              >
+                <Mail size={15} color={colors.tint} />
+                <Text style={[styles.contactPillText, { color: colors.tint }]}>{rep.email}</Text>
+              </TouchableOpacity>
             ) : null}
             {rep.visitDay ? (
-              <View style={styles.contactItem}>
-                <Calendar size={13} color={colors.textSecondary} />
-                <Text style={[styles.contactText, { color: colors.text }]}>{rep.visitDay}</Text>
+              <View style={[styles.contactPill, { backgroundColor: colors.warning + '12' }]}>
+                <Calendar size={15} color={colors.warning} />
+                <Text style={[styles.contactPillText, { color: colors.warning }]}>{rep.visitDay}</Text>
               </View>
             ) : null}
           </View>
         </View>
+
+        {/* Add Stock Entry CTA */}
+        <TouchableOpacity
+          style={styles.addStockBtn}
+          onPress={handleAddStock}
+          activeOpacity={0.85}
+        >
+          <LinearGradient
+            colors={colors.linearGradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.addStockGradient}
+          >
+            <Plus size={20} color="#fff" />
+            <Text style={styles.addStockText}>Add Stock Entry</Text>
+          </LinearGradient>
+        </TouchableOpacity>
 
         {/* Financial Summary */}
         <View style={styles.finRow}>
@@ -207,14 +261,28 @@ const styles = StyleSheet.create({
     width: 56, height: 56, borderRadius: 16, justifyContent: 'center', alignItems: 'center', marginBottom: 12,
   },
   repName: { fontSize: 22, fontWeight: '700', marginBottom: 2 },
-  company: { fontSize: 14, fontWeight: '600', marginBottom: 14 },
-  contactRow: { width: '100%', gap: 8 },
-  contactItem: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  contactText: { fontSize: 14 },
+  company: { fontSize: 14, fontWeight: '600', marginBottom: 16 },
+  contactActions: { width: '100%', gap: 8 },
+  contactPill: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    paddingHorizontal: 14, paddingVertical: 10, borderRadius: 10,
+  },
+  contactPillText: { fontSize: 14, fontWeight: '500' },
+  // Add Stock CTA
+  addStockBtn: {
+    borderRadius: 14, overflow: 'hidden', marginBottom: 16,
+  },
+  addStockGradient: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    paddingVertical: 14, gap: 8,
+  },
+  addStockText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  // Financial
   finRow: { flexDirection: 'row', gap: 8, marginBottom: 20 },
   finBox: { flex: 1, padding: 14, borderRadius: 12, borderWidth: 1, alignItems: 'center' },
   finValue: { fontSize: 14, fontWeight: '800', marginBottom: 2 },
   finLabel: { fontSize: 9, fontWeight: '500', textTransform: 'uppercase' },
+  // History
   section: { marginTop: 4 },
   sectionTitle: { fontSize: 16, fontWeight: '700', marginBottom: 12 },
   emptyText: { fontSize: 14, fontStyle: 'italic', textAlign: 'center', paddingVertical: 20 },

@@ -5,16 +5,17 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
-  ArrowLeft, Plus, Trash2, Search, Printer, X, UserPlus,
+  ArrowLeft, Plus, Trash2, Search, X, UserPlus, AlertTriangle,
 } from 'lucide-react-native';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
 import { useClinic } from '../../context/ClinicContext';
 import { DOSAGE_OPTIONS, DOSAGE_TIMINGS } from '../../utils/constants';
 import { formatCurrency } from '../../utils/helpers';
+import { SignaturePreview } from '../../components/SignaturePad';
 import {
   collection, getDocs, doc, setDoc, updateDoc, increment,
-  serverTimestamp, query, orderBy, where,
+  serverTimestamp, query, orderBy,
 } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 
@@ -28,6 +29,7 @@ type RxItem = {
   instructions: string;
   unitPrice: number;
   amount: number;
+  currentStock: number;
 };
 
 export default function PrescriptionFormScreen({ navigation, route }: any) {
@@ -54,6 +56,13 @@ export default function PrescriptionFormScreen({ navigation, route }: any) {
   const [showPatientSearch, setShowPatientSearch] = useState(false);
   const [medSearchQuery, setMedSearchQuery] = useState('');
   const [patientSearchQuery, setPatientSearchQuery] = useState('');
+
+  // Inline add patient
+  const [showInlineAdd, setShowInlineAdd] = useState(false);
+  const [newPatientName, setNewPatientName] = useState('');
+  const [newPatientPhone, setNewPatientPhone] = useState('');
+  const [newPatientAge, setNewPatientAge] = useState('');
+  const [addingPatient, setAddingPatient] = useState(false);
 
   const [saving, setSaving] = useState(false);
 
@@ -84,19 +93,32 @@ export default function PrescriptionFormScreen({ navigation, route }: any) {
     setPatients(list);
   };
 
+  // Auto-calculate quantity based on dosage pattern x duration
+  const calcQuantity = (dosage: string, duration: number): number => {
+    if (!dosage || !duration) return 1;
+    const parts = dosage.split('-').map(Number);
+    if (parts.some(isNaN)) return duration; // SOS or "As Directed"
+    const perDay = parts.reduce((a, b) => a + b, 0);
+    return perDay * duration;
+  };
+
   const addMedicine = (med: any) => {
+    const dosage = '1-0-1';
+    const duration = 5;
+    const qty = calcQuantity(dosage, duration);
     setItems((prev) => [
       ...prev,
       {
         medicineId: med.id,
         medicineName: med.name,
-        quantity: 1,
-        dosage: '1-0-1',
+        quantity: qty,
+        dosage,
         timing: 'After Food',
-        duration: 5,
+        duration,
         instructions: '',
         unitPrice: med.sellingPrice || 0,
-        amount: med.sellingPrice || 0,
+        amount: (med.sellingPrice || 0) * qty,
+        currentStock: med.currentStock || 0,
       },
     ]);
     setShowMedSearch(false);
@@ -107,6 +129,13 @@ export default function PrescriptionFormScreen({ navigation, route }: any) {
     setItems((prev) => {
       const updated = [...prev];
       (updated[index] as any)[field] = value;
+
+      // Auto-recalculate quantity when dosage or duration changes
+      if (field === 'dosage' || field === 'duration') {
+        const newQty = calcQuantity(updated[index].dosage, updated[index].duration);
+        updated[index].quantity = newQty;
+        updated[index].amount = newQty * (updated[index].unitPrice || 0);
+      }
       if (field === 'quantity' || field === 'unitPrice') {
         updated[index].amount = (updated[index].quantity || 0) * (updated[index].unitPrice || 0);
       }
@@ -128,6 +157,51 @@ export default function PrescriptionFormScreen({ navigation, route }: any) {
     setPatientGender(patient.gender || '');
     setShowPatientSearch(false);
     setPatientSearchQuery('');
+  };
+
+  // Inline quick-add patient
+  const handleQuickAddPatient = async () => {
+    if (!newPatientName.trim()) {
+      Alert.alert('Error', 'Patient name is required.');
+      return;
+    }
+    if (!activeClinic?.id) return;
+    try {
+      setAddingPatient(true);
+      const patRef = doc(collection(db, 'clinics', activeClinic.id, 'patients'));
+      const patientData = {
+        name: newPatientName.trim(),
+        phone: newPatientPhone.trim(),
+        age: newPatientAge ? parseInt(newPatientAge) : null,
+        gender: null,
+        bloodGroup: null,
+        allergies: null,
+        medicalHistory: null,
+        notes: null,
+        visitCount: 0,
+        lastVisit: null,
+        createdAt: serverTimestamp(),
+      };
+      await setDoc(patRef, patientData);
+
+      // Select the new patient
+      setPatientId(patRef.id);
+      setPatientName(newPatientName.trim());
+      setPatientPhone(newPatientPhone.trim());
+      setPatientAge(newPatientAge);
+      setShowInlineAdd(false);
+      setShowPatientSearch(false);
+      setNewPatientName('');
+      setNewPatientPhone('');
+      setNewPatientAge('');
+
+      // Refresh patients list
+      fetchPatients();
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'Failed to add patient.');
+    } finally {
+      setAddingPatient(false);
+    }
   };
 
   const handleSave = async () => {
@@ -154,6 +228,7 @@ export default function PrescriptionFormScreen({ navigation, route }: any) {
         patientGender: patientGender || null,
         doctorId: profile?.uid || '',
         doctorName: profile?.name || '',
+        signatureData: profile?.signatureData || null,
         diagnosis: diagnosis.trim() || null,
         items: items.map((item) => ({
           medicineId: item.medicineId,
@@ -283,71 +358,119 @@ export default function PrescriptionFormScreen({ navigation, route }: any) {
             </Text>
           </View>
         ) : (
-          items.map((item, idx) => (
-            <View key={idx} style={[styles.rxItem, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-              <View style={styles.rxItemHeader}>
-                <Text style={[styles.rxMedName, { color: colors.text }]}>{item.medicineName}</Text>
-                <TouchableOpacity onPress={() => removeItem(idx)}>
-                  <Trash2 size={16} color={colors.danger} />
-                </TouchableOpacity>
-              </View>
+          items.map((item, idx) => {
+            const isLowStock = item.currentStock <= 0;
+            const isWarnStock = item.currentStock > 0 && item.currentStock < item.quantity;
 
-              <View style={styles.rxRow}>
-                <View style={styles.rxField}>
-                  <Text style={[styles.rxFieldLabel, { color: colors.textSecondary }]}>Qty</Text>
-                  <TextInput
-                    style={[styles.rxInput, { color: colors.text, borderColor: colors.border }]}
-                    value={String(item.quantity)}
-                    onChangeText={(v) => updateItem(idx, 'quantity', parseInt(v) || 0)}
-                    keyboardType="numeric"
-                  />
+            return (
+              <View key={idx} style={[styles.rxItem, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                <View style={styles.rxItemHeader}>
+                  <View style={styles.rxMedNameRow}>
+                    <Text style={[styles.rxMedName, { color: colors.text }]}>{item.medicineName}</Text>
+                    {/* Stock warning */}
+                    <View style={[
+                      styles.stockBadge,
+                      {
+                        backgroundColor: isLowStock
+                          ? colors.danger + '15'
+                          : isWarnStock
+                            ? colors.warning + '15'
+                            : colors.success + '12',
+                      },
+                    ]}>
+                      {(isLowStock || isWarnStock) && <AlertTriangle size={10} color={isLowStock ? colors.danger : colors.warning} />}
+                      <Text style={[styles.stockBadgeText, {
+                        color: isLowStock ? colors.danger : isWarnStock ? colors.warning : colors.success,
+                      }]}>
+                        {item.currentStock} in stock
+                      </Text>
+                    </View>
+                  </View>
+                  <TouchableOpacity onPress={() => removeItem(idx)}>
+                    <Trash2 size={16} color={colors.danger} />
+                  </TouchableOpacity>
                 </View>
-                <View style={[styles.rxField, { flex: 1.5 }]}>
-                  <Text style={[styles.rxFieldLabel, { color: colors.textSecondary }]}>Dosage</Text>
-                  <TextInput
-                    style={[styles.rxInput, { color: colors.text, borderColor: colors.border }]}
-                    value={item.dosage}
-                    onChangeText={(v) => updateItem(idx, 'dosage', v)}
-                    placeholder="1-0-1"
-                    placeholderTextColor={colors.textSecondary + '60'}
-                  />
-                </View>
-                <View style={styles.rxField}>
-                  <Text style={[styles.rxFieldLabel, { color: colors.textSecondary }]}>Days</Text>
-                  <TextInput
-                    style={[styles.rxInput, { color: colors.text, borderColor: colors.border }]}
-                    value={String(item.duration)}
-                    onChangeText={(v) => updateItem(idx, 'duration', parseInt(v) || 0)}
-                    keyboardType="numeric"
-                  />
-                </View>
-              </View>
 
-              <View style={styles.rxRow}>
-                <View style={[styles.rxField, { flex: 2 }]}>
-                  <Text style={[styles.rxFieldLabel, { color: colors.textSecondary }]}>Timing</Text>
-                  <TextInput
-                    style={[styles.rxInput, { color: colors.text, borderColor: colors.border }]}
-                    value={item.timing}
-                    onChangeText={(v) => updateItem(idx, 'timing', v)}
-                  />
-                </View>
-                <View style={styles.rxField}>
-                  <Text style={[styles.rxFieldLabel, { color: colors.textSecondary }]}>Price</Text>
-                  <TextInput
-                    style={[styles.rxInput, { color: colors.text, borderColor: colors.border }]}
-                    value={String(item.unitPrice)}
-                    onChangeText={(v) => updateItem(idx, 'unitPrice', parseFloat(v) || 0)}
-                    keyboardType="decimal-pad"
-                  />
-                </View>
-              </View>
+                {/* Dosage Chips */}
+                <Text style={[styles.chipLabel, { color: colors.textSecondary }]}>Dosage</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>
+                  <View style={styles.chipRow}>
+                    {DOSAGE_OPTIONS.map((opt) => (
+                      <TouchableOpacity
+                        key={opt}
+                        style={[
+                          styles.chip,
+                          { borderColor: colors.border },
+                          item.dosage === opt && { backgroundColor: colors.secondary + '20', borderColor: colors.secondary },
+                        ]}
+                        onPress={() => updateItem(idx, 'dosage', opt)}
+                      >
+                        <Text style={[styles.chipText, { color: item.dosage === opt ? colors.secondary : colors.textSecondary }]}>
+                          {opt}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </ScrollView>
 
-              <Text style={[styles.rxAmount, { color: colors.secondary }]}>
-                Amount: {formatCurrency(item.amount)}
-              </Text>
-            </View>
-          ))
+                {/* Timing Chips */}
+                <Text style={[styles.chipLabel, { color: colors.textSecondary, marginTop: 8 }]}>Timing</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>
+                  <View style={styles.chipRow}>
+                    {DOSAGE_TIMINGS.map((opt) => (
+                      <TouchableOpacity
+                        key={opt}
+                        style={[
+                          styles.chip,
+                          { borderColor: colors.border },
+                          item.timing === opt && { backgroundColor: colors.accent + '20', borderColor: colors.accent },
+                        ]}
+                        onPress={() => updateItem(idx, 'timing', opt)}
+                      >
+                        <Text style={[styles.chipText, { color: item.timing === opt ? colors.accent : colors.textSecondary }]}>
+                          {opt}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </ScrollView>
+
+                <View style={[styles.rxRow, { marginTop: 10 }]}>
+                  <View style={styles.rxField}>
+                    <Text style={[styles.rxFieldLabel, { color: colors.textSecondary }]}>Days</Text>
+                    <TextInput
+                      style={[styles.rxInput, { color: colors.text, borderColor: colors.border }]}
+                      value={String(item.duration)}
+                      onChangeText={(v) => updateItem(idx, 'duration', parseInt(v) || 0)}
+                      keyboardType="numeric"
+                    />
+                  </View>
+                  <View style={styles.rxField}>
+                    <Text style={[styles.rxFieldLabel, { color: colors.textSecondary }]}>Qty (auto)</Text>
+                    <TextInput
+                      style={[styles.rxInput, { color: colors.text, borderColor: colors.border }]}
+                      value={String(item.quantity)}
+                      onChangeText={(v) => updateItem(idx, 'quantity', parseInt(v) || 0)}
+                      keyboardType="numeric"
+                    />
+                  </View>
+                  <View style={styles.rxField}>
+                    <Text style={[styles.rxFieldLabel, { color: colors.textSecondary }]}>Price</Text>
+                    <TextInput
+                      style={[styles.rxInput, { color: colors.text, borderColor: colors.border }]}
+                      value={String(item.unitPrice)}
+                      onChangeText={(v) => updateItem(idx, 'unitPrice', parseFloat(v) || 0)}
+                      keyboardType="decimal-pad"
+                    />
+                  </View>
+                </View>
+
+                <Text style={[styles.rxAmount, { color: colors.secondary }]}>
+                  Amount: {formatCurrency(item.amount)}
+                </Text>
+              </View>
+            );
+          })
         )}
 
         {/* Total */}
@@ -367,6 +490,20 @@ export default function PrescriptionFormScreen({ navigation, route }: any) {
           placeholderTextColor={colors.textSecondary + '80'}
           multiline
         />
+
+        {/* Signature Preview */}
+        {profile?.signatureData ? (
+          <View style={[styles.signatureSection, { borderColor: colors.border }]}>
+            <Text style={[styles.sectionLabel, { color: colors.textSecondary, marginBottom: 8 }]}>Doctor Signature</Text>
+            <SignaturePreview pathData={profile.signatureData} height={60} />
+          </View>
+        ) : (
+          <View style={[styles.noSignature, { borderColor: colors.border }]}>
+            <Text style={[styles.noSignatureText, { color: colors.textSecondary }]}>
+              No signature saved. Add one in your Profile.
+            </Text>
+          </View>
+        )}
 
         {/* Actions */}
         <TouchableOpacity
@@ -404,19 +541,27 @@ export default function PrescriptionFormScreen({ navigation, route }: any) {
             <FlatList
               data={filteredMeds}
               keyExtractor={(item) => item.id}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={[styles.modalItem, { borderBottomColor: colors.divider }]}
-                  onPress={() => addMedicine(item)}
-                >
-                  <View>
-                    <Text style={[styles.modalItemName, { color: colors.text }]}>{item.name}</Text>
-                    <Text style={[styles.modalItemMeta, { color: colors.textSecondary }]}>
-                      {item.category} — Stock: {item.currentStock} — {formatCurrency(item.sellingPrice || 0)}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-              )}
+              renderItem={({ item }) => {
+                const isLow = (item.currentStock || 0) <= 0;
+                return (
+                  <TouchableOpacity
+                    style={[styles.modalItem, { borderBottomColor: colors.divider }]}
+                    onPress={() => addMedicine(item)}
+                  >
+                    <View style={styles.modalItemLeft}>
+                      <Text style={[styles.modalItemName, { color: colors.text }]}>{item.name}</Text>
+                      <Text style={[styles.modalItemMeta, { color: colors.textSecondary }]}>
+                        {item.category} — {formatCurrency(item.sellingPrice || 0)}
+                      </Text>
+                    </View>
+                    <View style={[styles.stockPill, { backgroundColor: isLow ? colors.danger + '15' : colors.success + '12' }]}>
+                      <Text style={[styles.stockPillText, { color: isLow ? colors.danger : colors.success }]}>
+                        {item.currentStock || 0}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                );
+              }}
               ListEmptyComponent={
                 <Text style={[styles.emptyText, { color: colors.textSecondary, paddingVertical: 20, textAlign: 'center' }]}>
                   No medicines found
@@ -433,10 +578,70 @@ export default function PrescriptionFormScreen({ navigation, route }: any) {
           <View style={[styles.modalContent, { backgroundColor: colors.surface }]}>
             <View style={styles.modalHeader}>
               <Text style={[styles.modalTitle, { color: colors.text }]}>Select Patient</Text>
-              <TouchableOpacity onPress={() => { setShowPatientSearch(false); setPatientSearchQuery(''); }}>
+              <TouchableOpacity onPress={() => { setShowPatientSearch(false); setPatientSearchQuery(''); setShowInlineAdd(false); }}>
                 <X size={22} color={colors.textSecondary} />
               </TouchableOpacity>
             </View>
+
+            {/* Quick Add Patient */}
+            {!showInlineAdd ? (
+              <TouchableOpacity
+                style={[styles.quickAddBtn, { backgroundColor: colors.secondary + '12' }]}
+                onPress={() => setShowInlineAdd(true)}
+              >
+                <UserPlus size={18} color={colors.secondary} />
+                <Text style={[styles.quickAddText, { color: colors.secondary }]}>Quick Add New Patient</Text>
+              </TouchableOpacity>
+            ) : (
+              <View style={[styles.inlineAddForm, { backgroundColor: colors.inputBg, borderColor: colors.border }]}>
+                <TextInput
+                  style={[styles.inlineInput, { color: colors.text, borderColor: colors.border }]}
+                  value={newPatientName}
+                  onChangeText={setNewPatientName}
+                  placeholder="Patient name *"
+                  placeholderTextColor={colors.textSecondary + '80'}
+                  autoFocus
+                />
+                <View style={styles.inlineRow}>
+                  <TextInput
+                    style={[styles.inlineInput, styles.flex1, { color: colors.text, borderColor: colors.border }]}
+                    value={newPatientPhone}
+                    onChangeText={setNewPatientPhone}
+                    placeholder="Phone"
+                    placeholderTextColor={colors.textSecondary + '80'}
+                    keyboardType="phone-pad"
+                  />
+                  <TextInput
+                    style={[styles.inlineInput, { width: 60, color: colors.text, borderColor: colors.border }]}
+                    value={newPatientAge}
+                    onChangeText={setNewPatientAge}
+                    placeholder="Age"
+                    placeholderTextColor={colors.textSecondary + '80'}
+                    keyboardType="numeric"
+                  />
+                </View>
+                <View style={styles.inlineActions}>
+                  <TouchableOpacity
+                    style={[styles.inlineCancelBtn, { borderColor: colors.border }]}
+                    onPress={() => setShowInlineAdd(false)}
+                  >
+                    <Text style={[styles.inlineCancelText, { color: colors.textSecondary }]}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.inlineSaveBtn, { backgroundColor: colors.secondary }]}
+                    onPress={handleQuickAddPatient}
+                    disabled={addingPatient}
+                  >
+                    {addingPatient ? (
+                      <ActivityIndicator size="small" color="#fff" />
+                    ) : (
+                      <Text style={styles.inlineSaveText}>Add & Select</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+
             <View style={[styles.modalSearch, { backgroundColor: colors.inputBg, borderColor: colors.border }]}>
               <Search size={16} color={colors.textSecondary} />
               <TextInput
@@ -445,7 +650,6 @@ export default function PrescriptionFormScreen({ navigation, route }: any) {
                 onChangeText={setPatientSearchQuery}
                 placeholder="Search by name or phone..."
                 placeholderTextColor={colors.textSecondary + '80'}
-                autoFocus
               />
             </View>
             <FlatList
@@ -501,8 +705,21 @@ const styles = StyleSheet.create({
   emptyMeds: { padding: 24, borderWidth: 1, borderStyle: 'dashed', borderRadius: 12, alignItems: 'center' },
   emptyText: { fontSize: 14 },
   rxItem: { padding: 14, borderWidth: 1, borderRadius: 14, marginBottom: 10 },
-  rxItemHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
-  rxMedName: { fontSize: 15, fontWeight: '600', flex: 1, marginRight: 8 },
+  rxItemHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 },
+  rxMedNameRow: { flex: 1, marginRight: 8 },
+  rxMedName: { fontSize: 15, fontWeight: '600', marginBottom: 4 },
+  stockBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, alignSelf: 'flex-start',
+  },
+  stockBadgeText: { fontSize: 10, fontWeight: '600' },
+  chipLabel: { fontSize: 10, fontWeight: '600', textTransform: 'uppercase', marginBottom: 6 },
+  chipScroll: { marginBottom: 4 },
+  chipRow: { flexDirection: 'row', gap: 6 },
+  chip: {
+    paddingHorizontal: 12, paddingVertical: 7, borderRadius: 8, borderWidth: 1,
+  },
+  chipText: { fontSize: 12, fontWeight: '600' },
   rxRow: { flexDirection: 'row', gap: 8, marginBottom: 8 },
   rxField: { flex: 1 },
   rxFieldLabel: { fontSize: 10, fontWeight: '600', marginBottom: 4, textTransform: 'uppercase' },
@@ -514,11 +731,19 @@ const styles = StyleSheet.create({
   },
   totalLabel: { fontSize: 14, fontWeight: '500' },
   totalValue: { fontSize: 20, fontWeight: '800' },
+  // Signature
+  signatureSection: {
+    marginTop: 16, padding: 12, borderWidth: 1, borderRadius: 12, borderStyle: 'dashed', alignItems: 'center',
+  },
+  noSignature: {
+    marginTop: 16, padding: 14, borderWidth: 1, borderRadius: 12, borderStyle: 'dashed', alignItems: 'center',
+  },
+  noSignatureText: { fontSize: 12, fontStyle: 'italic' },
   saveBtn: { height: 50, borderRadius: 12, justifyContent: 'center', alignItems: 'center', marginTop: 20 },
   saveBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
   // Modal
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  modalContent: { maxHeight: '70%', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20 },
+  modalContent: { maxHeight: '75%', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20 },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
   modalTitle: { fontSize: 18, fontWeight: '700' },
   modalSearch: {
@@ -526,7 +751,32 @@ const styles = StyleSheet.create({
     borderRadius: 10, paddingHorizontal: 12, marginBottom: 12, gap: 8,
   },
   modalSearchInput: { flex: 1, fontSize: 15, height: '100%' },
-  modalItem: { paddingVertical: 14, borderBottomWidth: 1 },
+  modalItem: { paddingVertical: 14, borderBottomWidth: 1, flexDirection: 'row', alignItems: 'center' },
+  modalItemLeft: { flex: 1 },
   modalItemName: { fontSize: 15, fontWeight: '600', marginBottom: 2 },
   modalItemMeta: { fontSize: 12 },
+  stockPill: {
+    paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, marginLeft: 8,
+  },
+  stockPillText: { fontSize: 12, fontWeight: '700' },
+  // Quick Add Patient
+  quickAddBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    paddingHorizontal: 16, paddingVertical: 12, borderRadius: 12, marginBottom: 12,
+  },
+  quickAddText: { fontSize: 14, fontWeight: '600' },
+  inlineAddForm: {
+    padding: 14, borderRadius: 14, borderWidth: 1, marginBottom: 12,
+  },
+  inlineInput: {
+    height: 40, borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, fontSize: 14, marginBottom: 8,
+  },
+  inlineRow: { flexDirection: 'row', gap: 8 },
+  inlineActions: { flexDirection: 'row', gap: 8, marginTop: 4 },
+  inlineCancelBtn: {
+    flex: 1, paddingVertical: 10, borderRadius: 10, borderWidth: 1, alignItems: 'center',
+  },
+  inlineCancelText: { fontSize: 13, fontWeight: '600' },
+  inlineSaveBtn: { flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: 'center' },
+  inlineSaveText: { color: '#fff', fontSize: 13, fontWeight: '700' },
 });
