@@ -35,8 +35,12 @@ export default function SignaturePad({
     return initialData.split('|||').filter(Boolean);
   };
 
-  const [paths, setPaths] = useState<string[]>(parseInitialPaths);
+  const initialPaths = parseInitialPaths();
+  const [paths, setPaths] = useState<string[]>(initialPaths);
   const [currentPath, setCurrentPath] = useState<string>('');
+
+  const pathsRef = useRef<string[]>(initialPaths);
+  const currentPathRef = useRef<string>('');
 
   const panResponder = useRef(
     PanResponder.create({
@@ -44,15 +48,22 @@ export default function SignaturePad({
       onMoveShouldSetPanResponder: () => true,
       onPanResponderGrant: (evt) => {
         const { locationX, locationY } = evt.nativeEvent;
-        setCurrentPath(`M${locationX.toFixed(1)},${locationY.toFixed(1)}`);
+        const newPath = `M${locationX.toFixed(1)},${locationY.toFixed(1)}`;
+        currentPathRef.current = newPath;
+        setCurrentPath(newPath);
       },
       onPanResponderMove: (evt) => {
         const { locationX, locationY } = evt.nativeEvent;
-        setCurrentPath((prev) => `${prev} L${locationX.toFixed(1)},${locationY.toFixed(1)}`);
+        const newPath = `${currentPathRef.current} L${locationX.toFixed(1)},${locationY.toFixed(1)}`;
+        currentPathRef.current = newPath;
+        setCurrentPath(newPath);
       },
       onPanResponderRelease: () => {
-        if (currentPath) {
-          setPaths((prev) => [...prev, currentPath]);
+        if (currentPathRef.current) {
+          const newPaths = [...pathsRef.current, currentPathRef.current];
+          pathsRef.current = newPaths;
+          setPaths(newPaths);
+          currentPathRef.current = '';
           setCurrentPath('');
         }
       },
@@ -60,17 +71,21 @@ export default function SignaturePad({
   ).current;
 
   const handleClear = () => {
+    pathsRef.current = [];
     setPaths([]);
+    currentPathRef.current = '';
     setCurrentPath('');
   };
 
   const handleUndo = () => {
-    setPaths((prev) => prev.slice(0, -1));
+    const newPaths = pathsRef.current.slice(0, -1);
+    pathsRef.current = newPaths;
+    setPaths(newPaths);
   };
 
   const handleSave = () => {
     // Combine all paths with separator
-    const combined = paths.join('|||');
+    const combined = pathsRef.current.join('|||');
     onSave(combined);
   };
 

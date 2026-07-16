@@ -36,6 +36,7 @@ export default function StockEntryScreen({ navigation, route }: any) {
   const [companyName, setCompanyName] = useState(paramCompany);
   const [paymentTermDays, setPaymentTermDays] = useState(String(DEFAULT_PAYMENT_TERM_DAYS));
   const [saving, setSaving] = useState(false);
+  const [focusedField, setFocusedField] = useState<string | null>(null);
 
   // Data for dropdowns
   const [medicines, setMedicines] = useState<any[]>([]);
@@ -161,26 +162,39 @@ export default function StockEntryScreen({ navigation, route }: any) {
   const renderInput = (
     label: string, value: string, onChangeText: (t: string) => void,
     opts: { placeholder?: string; keyboardType?: any; required?: boolean; editable?: boolean } = {}
-  ) => (
-    <View style={styles.inputGroup}>
-      <Text style={[styles.label, { color: colors.text }]}>
-        {label}{opts.required && <Text style={{ color: colors.danger }}> *</Text>}
-      </Text>
-      <TextInput
-        style={[
-          styles.input,
-          { color: colors.text, backgroundColor: colors.inputBg, borderColor: colors.border },
-          opts.editable === false && { opacity: 0.65 }
-        ]}
-        value={value}
-        onChangeText={onChangeText}
-        placeholder={opts.placeholder}
-        placeholderTextColor={colors.textSecondary + '80'}
-        keyboardType={opts.keyboardType || 'default'}
-        editable={opts.editable !== false}
-      />
-    </View>
-  );
+  ) => {
+    const isFocused = focusedField === label;
+    return (
+      <View style={styles.inputGroup}>
+        <Text style={[styles.label, { color: colors.text }]}>
+          {label}{opts.required && <Text style={{ color: colors.danger }}> *</Text>}
+        </Text>
+        <TextInput
+          style={[
+            styles.input,
+            { color: colors.text, backgroundColor: colors.inputBg, borderColor: colors.border },
+            opts.editable === false && { opacity: 0.65 },
+            isFocused && {
+              borderColor: colors.secondary,
+              shadowColor: colors.secondary,
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.15,
+              shadowRadius: 6,
+              elevation: 3,
+            }
+          ]}
+          value={value}
+          onChangeText={onChangeText}
+          placeholder={opts.placeholder}
+          placeholderTextColor={colors.textSecondary + '80'}
+          keyboardType={opts.keyboardType || 'default'}
+          editable={opts.editable !== false}
+          onFocus={() => setFocusedField(label)}
+          onBlur={() => setFocusedField(null)}
+        />
+      </View>
+    );
+  };
 
   const isMedicineLocked = !!paramMedicineId;
   const isRepLocked = !!paramRepId;

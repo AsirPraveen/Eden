@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  Alert, RefreshControl,
+  Alert, RefreshControl, Linking, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
@@ -113,10 +113,17 @@ export default function PatientDetailsScreen({ navigation, route }: any) {
 
           <View style={styles.detailsGrid}>
             {patient.phone ? (
-              <View style={styles.detailRow}>
-                <Phone size={14} color={colors.textSecondary} />
-                <Text style={[styles.detailText, { color: colors.text }]}>{patient.phone}</Text>
-              </View>
+              <TouchableOpacity
+                style={styles.detailRow}
+                onPress={() => {
+                  const url = Platform.OS === 'ios' ? `telprompt:${patient.phone}` : `tel:${patient.phone}`;
+                  Linking.openURL(url).catch(() => Alert.alert('Error', 'Could not open phone dialer.'));
+                }}
+                activeOpacity={0.7}
+              >
+                <Phone size={14} color={colors.secondary} />
+                <Text style={[styles.detailText, { color: colors.secondary, textDecorationLine: 'underline' }]}>{patient.phone}</Text>
+              </TouchableOpacity>
             ) : null}
             {patient.age ? (
               <View style={styles.detailRow}>

@@ -21,6 +21,7 @@ export default function AddRepScreen({ navigation }: any) {
   const [visitDay, setVisitDay] = useState('');
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
+  const [focusedField, setFocusedField] = useState<string | null>(null);
 
   const handleSave = async () => {
     if (!name.trim() || !company.trim()) {
@@ -59,26 +60,39 @@ export default function AddRepScreen({ navigation }: any) {
   const renderInput = (
     label: string, value: string, onChangeText: (t: string) => void,
     opts: { placeholder?: string; keyboardType?: any; required?: boolean; multiline?: boolean } = {}
-  ) => (
-    <View style={styles.inputGroup}>
-      <Text style={[styles.label, { color: colors.text }]}>
-        {label}{opts.required && <Text style={{ color: colors.danger }}> *</Text>}
-      </Text>
-      <TextInput
-        style={[
-          styles.input,
-          { color: colors.text, backgroundColor: colors.inputBg, borderColor: colors.border },
-          opts.multiline && { height: 80, textAlignVertical: 'top', paddingTop: 12 },
-        ]}
-        value={value}
-        onChangeText={onChangeText}
-        placeholder={opts.placeholder}
-        placeholderTextColor={colors.textSecondary + '80'}
-        keyboardType={opts.keyboardType || 'default'}
-        multiline={opts.multiline}
-      />
-    </View>
-  );
+  ) => {
+    const isFocused = focusedField === label;
+    return (
+      <View style={styles.inputGroup}>
+        <Text style={[styles.label, { color: colors.text }]}>
+          {label}{opts.required && <Text style={{ color: colors.danger }}> *</Text>}
+        </Text>
+        <TextInput
+          style={[
+            styles.input,
+            { color: colors.text, backgroundColor: colors.inputBg, borderColor: colors.border },
+            opts.multiline && { height: 80, textAlignVertical: 'top', paddingTop: 12 },
+            isFocused && {
+              borderColor: colors.secondary,
+              shadowColor: colors.secondary,
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.15,
+              shadowRadius: 6,
+              elevation: 3,
+            }
+          ]}
+          value={value}
+          onChangeText={onChangeText}
+          placeholder={opts.placeholder}
+          placeholderTextColor={colors.textSecondary + '80'}
+          keyboardType={opts.keyboardType || 'default'}
+          multiline={opts.multiline}
+          onFocus={() => setFocusedField(label)}
+          onBlur={() => setFocusedField(null)}
+        />
+      </View>
+    );
+  };
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]}>

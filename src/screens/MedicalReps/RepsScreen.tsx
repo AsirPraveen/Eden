@@ -272,7 +272,16 @@ const styles = StyleSheet.create({
   outstandingBarAmt: { fontSize: 16, fontWeight: '800' },
   list: { padding: 16, paddingTop: 12 },
   card: {
-    borderRadius: 14, borderWidth: 1, marginBottom: 10, padding: 14, overflow: 'hidden',
+    borderRadius: 16,
+    borderWidth: 1,
+    marginBottom: 10,
+    padding: 14,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.04,
+    shadowRadius: 12,
+    elevation: 2,
   },
   cardBody: { flexDirection: 'row', alignItems: 'center' },
   avatar: {

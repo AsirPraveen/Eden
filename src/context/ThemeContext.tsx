@@ -26,6 +26,9 @@ export type ColorsType = {
   downGradient: string;
   upGradient: string;
   tabIconNonActive: string;
+  glassBackground: string;
+  glassBorder: string;
+  neonAccent: string;
 };
 
 export const colorsConfig: Record<ThemeType, ColorsType> = {
@@ -52,6 +55,9 @@ export const colorsConfig: Record<ThemeType, ColorsType> = {
     downGradient: '#2E8B6E',
     upGradient: '#1B4D3E',
     tabIconNonActive: '#F8F9FA',
+    glassBackground: 'rgba(255, 255, 255, 0.75)',
+    glassBorder: 'rgba(255, 255, 255, 0.5)',
+    neonAccent: '#2E8B6E',
   },
   dark: {
     theme: 'dark',
@@ -76,6 +82,9 @@ export const colorsConfig: Record<ThemeType, ColorsType> = {
     downGradient: '#132F1F',
     upGradient: '#0A1A12',
     tabIconNonActive: '#8B949E',
+    glassBackground: 'rgba(22, 27, 34, 0.75)',
+    glassBorder: 'rgba(255, 255, 255, 0.08)',
+    neonAccent: '#3FB88C',
   },
 };
 

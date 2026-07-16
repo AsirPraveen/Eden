@@ -12,7 +12,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useClinic } from '../../context/ClinicContext';
 import { DOSAGE_OPTIONS, DOSAGE_TIMINGS } from '../../utils/constants';
 import { formatCurrency } from '../../utils/helpers';
-import { SignaturePreview } from '../../components/SignaturePad';
+import SignaturePad, { SignaturePreview } from '../../components/SignaturePad';
 import {
   collection, getDocs, doc, setDoc, updateDoc, increment,
   serverTimestamp, query, orderBy,
@@ -34,8 +34,19 @@ type RxItem = {
 
 export default function PrescriptionFormScreen({ navigation, route }: any) {
   const { colors } = useTheme();
-  const { profile } = useAuth();
+  const { profile, refreshProfile } = useAuth();
   const { activeClinic } = useClinic();
+
+  // Signature States
+  const [customSignature, setCustomSignature] = useState<string>('');
+  const [showSigDrawing, setShowSigDrawing] = useState(false);
+  const [saveAsDefault, setSaveAsDefault] = useState(false);
+
+  useEffect(() => {
+    if (profile?.signatureData) {
+      setCustomSignature(profile.signatureData);
+    }
+  }, [profile?.signatureData]);
 
   // Patient
   const [patientName, setPatientName] = useState('');
@@ -228,7 +239,7 @@ export default function PrescriptionFormScreen({ navigation, route }: any) {
         patientGender: patientGender || null,
         doctorId: profile?.uid || '',
         doctorName: profile?.name || '',
-        signatureData: profile?.signatureData || null,
+        signatureData: customSignature || null,
         diagnosis: diagnosis.trim() || null,
         items: items.map((item) => ({
           medicineId: item.medicineId,
@@ -245,6 +256,19 @@ export default function PrescriptionFormScreen({ navigation, route }: any) {
         notes: notes.trim() || null,
         createdAt: serverTimestamp(),
       });
+
+      // Save to profile as default if checked
+      if (customSignature && saveAsDefault && profile?.uid) {
+        try {
+          const userRef = doc(db, 'users', profile.uid);
+          await updateDoc(userRef, {
+            signatureData: customSignature,
+          });
+          await refreshProfile();
+        } catch (profileErr) {
+          console.error('Failed to update default profile signature:', profileErr);
+        }
+      }
 
       // Decrement stock for each medicine
       for (const item of items) {
@@ -491,19 +515,91 @@ export default function PrescriptionFormScreen({ navigation, route }: any) {
           multiline
         />
 
-        {/* Signature Preview */}
-        {profile?.signatureData ? (
-          <View style={[styles.signatureSection, { borderColor: colors.border }]}>
-            <Text style={[styles.sectionLabel, { color: colors.textSecondary, marginBottom: 8 }]}>Doctor Signature</Text>
-            <SignaturePreview pathData={profile.signatureData} height={60} />
+        {/* Signature Selection Area */}
+        <View style={[styles.signatureBox, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <View style={styles.signatureBoxHeader}>
+            <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>Doctor's Signature</Text>
+            {profile?.signatureData && (
+              <TouchableOpacity
+                style={[styles.sigModeBtn, { backgroundColor: colors.secondary + '15' }]}
+                onPress={() => {
+                  setCustomSignature(profile.signatureData || '');
+                }}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.sigModeBtnText, { color: colors.secondary }]}>
+                  Use Profile Signature
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
-        ) : (
-          <View style={[styles.noSignature, { borderColor: colors.border }]}>
-            <Text style={[styles.noSignatureText, { color: colors.textSecondary }]}>
-              No signature saved. Add one in your Profile.
-            </Text>
+
+          {customSignature ? (
+            <View style={styles.sigPreviewCard}>
+              <SignaturePreview pathData={customSignature} height={60} />
+              <View style={styles.sigActionsRow}>
+                <TouchableOpacity
+                  onPress={() => setShowSigDrawing(true)}
+                  style={styles.sigActionBtn}
+                >
+                  <Text style={[styles.sigActionBtnText, { color: colors.secondary }]}>Redraw</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => setCustomSignature('')}
+                  style={styles.sigActionBtn}
+                >
+                  <Text style={[styles.sigActionBtnText, { color: colors.danger }]}>Clear</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => setSaveAsDefault(!saveAsDefault)}
+                  style={styles.checkboxContainer}
+                  activeOpacity={0.7}
+                >
+                  <View style={[
+                    styles.checkbox,
+                    { borderColor: colors.border },
+                    saveAsDefault && { backgroundColor: colors.secondary, borderColor: colors.secondary }
+                  ]}>
+                    {saveAsDefault && <Text style={styles.checkIcon}>✓</Text>}
+                  </View>
+                  <Text style={[styles.checkboxLabel, { color: colors.textSecondary }]}>Save to profile</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          ) : (
+            <TouchableOpacity
+              style={[styles.sigDrawPlaceholder, { borderColor: colors.border }]}
+              onPress={() => setShowSigDrawing(true)}
+              activeOpacity={0.6}
+            >
+              <Text style={[styles.drawPlaceholderText, { color: colors.textSecondary }]}>
+                Tap here to draw signature
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {/* Signature Pad Drawing Modal */}
+        <Modal visible={showSigDrawing} animationType="slide" transparent>
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { backgroundColor: colors.surface, paddingBottom: 24 }]}>
+              <View style={styles.modalHeader}>
+                <Text style={[styles.modalTitle, { color: colors.text }]}>Draw Signature</Text>
+                <TouchableOpacity onPress={() => setShowSigDrawing(false)}>
+                  <X size={22} color={colors.textSecondary} />
+                </TouchableOpacity>
+              </View>
+              <SignaturePad
+                onSave={(path) => {
+                  setCustomSignature(path);
+                  setShowSigDrawing(false);
+                }}
+                onCancel={() => setShowSigDrawing(false)}
+                initialData={customSignature}
+              />
+            </View>
           </View>
-        )}
+        </Modal>
 
         {/* Actions */}
         <TouchableOpacity
@@ -731,14 +827,86 @@ const styles = StyleSheet.create({
   },
   totalLabel: { fontSize: 14, fontWeight: '500' },
   totalValue: { fontSize: 20, fontWeight: '800' },
-  // Signature
-  signatureSection: {
-    marginTop: 16, padding: 12, borderWidth: 1, borderRadius: 12, borderStyle: 'dashed', alignItems: 'center',
+  // Signature styles
+  signatureBox: {
+    marginTop: 18,
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
   },
-  noSignature: {
-    marginTop: 16, padding: 14, borderWidth: 1, borderRadius: 12, borderStyle: 'dashed', alignItems: 'center',
+  signatureBoxHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+    flexWrap: 'wrap',
+    gap: 8,
   },
-  noSignatureText: { fontSize: 12, fontStyle: 'italic' },
+  sigModeBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  sigModeBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  sigPreviewCard: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+  },
+  sigActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
+    marginTop: 10,
+    paddingHorizontal: 8,
+  },
+  sigActionBtn: {
+    paddingVertical: 4,
+  },
+  sigActionBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  checkboxContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  checkbox: {
+    width: 16,
+    height: 16,
+    borderRadius: 4,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkIcon: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: 'bold',
+    marginTop: -1,
+  },
+  checkboxLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  sigDrawPlaceholder: {
+    height: 80,
+    borderWidth: 1.5,
+    borderRadius: 14,
+    borderStyle: 'dashed',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  drawPlaceholderText: {
+    fontSize: 13,
+    fontStyle: 'italic',
+    fontWeight: '500',
+  },
   saveBtn: { height: 50, borderRadius: 12, justifyContent: 'center', alignItems: 'center', marginTop: 20 },
   saveBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
   // Modal

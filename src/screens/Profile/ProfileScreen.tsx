@@ -1,30 +1,51 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  View, Text, ScrollView, StyleSheet, TouchableOpacity, RefreshControl,
+  View, Text, ScrollView, StyleSheet, TouchableOpacity, RefreshControl, Modal, Alert, ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
   UserCircle, Settings, FileText, Package, Users, CreditCard,
-  ChevronRight, BarChart3, Clock,
+  ChevronRight, BarChart3, Clock, X,
 } from 'lucide-react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
 import { useClinic } from '../../context/ClinicContext';
 import { formatCurrency, toDate, cleanDoctorName } from '../../utils/helpers';
+import SignaturePad, { SignaturePreview } from '../../components/SignaturePad';
 import {
-  collection, getDocs, query, where, orderBy, limit,
+  collection, getDocs, query, where, orderBy, limit, doc, updateDoc,
 } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 
 export default function ProfileScreen() {
   const navigation = useNavigation<any>();
   const { colors } = useTheme();
-  const { profile, user } = useAuth();
+  const { profile, user, refreshProfile } = useAuth();
   const { activeClinic, clinicRole, clinics } = useClinic();
 
   const [refreshing, setRefreshing] = useState(false);
+  const [showSignatureModal, setShowSignatureModal] = useState(false);
+  const [savingSignature, setSavingSignature] = useState(false);
+
+  const handleSaveSignature = async (pathData: string) => {
+    if (!user?.uid) return;
+    try {
+      setSavingSignature(true);
+      const userRef = doc(db, 'users', user.uid);
+      await updateDoc(userRef, {
+        signatureData: pathData || null,
+      });
+      await refreshProfile();
+      setShowSignatureModal(false);
+      Alert.alert('Success', 'Signature updated successfully.');
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to save signature.');
+    } finally {
+      setSavingSignature(false);
+    }
+  };
   const [stats, setStats] = useState({
     totalPrescriptions: 0,
     totalPatients: 0,
@@ -235,6 +256,57 @@ export default function ProfileScreen() {
             ))}
           </View>
         )}
+        {/* Doctor's Signature Card */}
+        <View style={[styles.signatureCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <View style={styles.signatureHeader}>
+            <Text style={[styles.signatureTitle, { color: colors.text }]}>DOCTOR'S SIGNATURE</Text>
+            <TouchableOpacity
+              onPress={() => setShowSignatureModal(true)}
+              style={[styles.editSigBtn, { backgroundColor: colors.secondary + '15' }]}
+            >
+              <Text style={[styles.editSigText, { color: colors.secondary }]}>
+                {profile?.signatureData ? 'Edit' : 'Add'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+          {profile?.signatureData ? (
+            <View style={styles.sigPreviewWrap}>
+              <SignaturePreview pathData={profile.signatureData} height={80} />
+            </View>
+          ) : (
+            <View style={styles.noSigWrap}>
+              <Text style={[styles.noSigText, { color: colors.textSecondary }]}>
+                No digital signature saved. Add one to auto-apply it to future prescriptions.
+              </Text>
+            </View>
+          )}
+        </View>
+
+        {/* Signature drawing modal */}
+        <Modal visible={showSignatureModal} animationType="slide" transparent>
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { backgroundColor: colors.surface }]}>
+              <View style={styles.modalHeader}>
+                <Text style={[styles.modalTitle, { color: colors.text }]}>Draw Signature</Text>
+                <TouchableOpacity onPress={() => setShowSignatureModal(false)}>
+                  <X size={22} color={colors.textSecondary} />
+                </TouchableOpacity>
+              </View>
+              {savingSignature ? (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="large" color={colors.secondary} />
+                  <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Saving signature...</Text>
+                </View>
+              ) : (
+                <SignaturePad
+                  onSave={handleSaveSignature}
+                  onCancel={() => setShowSignatureModal(false)}
+                  initialData={profile?.signatureData}
+                />
+              )}
+            </View>
+          </View>
+        </Modal>
 
         <View style={{ height: 30 }} />
       </ScrollView>
@@ -314,4 +386,80 @@ const styles = StyleSheet.create({
   clinicAddr: { fontSize: 12 },
   activeBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
   activeText: { fontSize: 11, fontWeight: '700' },
+
+  // Signature styles
+  signatureCard: {
+    padding: 18,
+    borderRadius: 16,
+    borderWidth: 1,
+    marginTop: 16,
+  },
+  signatureHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  signatureTitle: {
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  editSigBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  editSigText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  sigPreviewWrap: {
+    height: 80,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  noSigWrap: {
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  noSigText: {
+    fontSize: 12,
+    textAlign: 'center',
+    lineHeight: 18,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    width: '100%',
+    borderRadius: 20,
+    padding: 20,
+    elevation: 5,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  loadingContainer: {
+    paddingVertical: 40,
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
+  },
 });

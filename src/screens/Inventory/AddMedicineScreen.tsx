@@ -29,6 +29,7 @@ export default function AddMedicineScreen({ navigation }: any) {
   const [sellingPrice, setSellingPrice] = useState('');
   const [showCategories, setShowCategories] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [focusedField, setFocusedField] = useState<string | null>(null);
 
   const handleSave = async () => {
     if (!name.trim()) {
@@ -79,22 +80,38 @@ export default function AddMedicineScreen({ navigation }: any) {
     value: string,
     onChangeText: (t: string) => void,
     opts: { placeholder?: string; keyboardType?: any; required?: boolean } = {}
-  ) => (
-    <View style={styles.inputGroup}>
-      <Text style={[styles.label, { color: colors.text }]}>
-        {label}
-        {opts.required && <Text style={{ color: colors.danger }}> *</Text>}
-      </Text>
-      <TextInput
-        style={[styles.input, { color: colors.text, backgroundColor: colors.inputBg, borderColor: colors.border }]}
-        value={value}
-        onChangeText={onChangeText}
-        placeholder={opts.placeholder}
-        placeholderTextColor={colors.textSecondary + '80'}
-        keyboardType={opts.keyboardType || 'default'}
-      />
-    </View>
-  );
+  ) => {
+    const isFocused = focusedField === label;
+    return (
+      <View style={styles.inputGroup}>
+        <Text style={[styles.label, { color: colors.text }]}>
+          {label}
+          {opts.required && <Text style={{ color: colors.danger }}> *</Text>}
+        </Text>
+        <TextInput
+          style={[
+            styles.input,
+            { color: colors.text, backgroundColor: colors.inputBg, borderColor: colors.border },
+            isFocused && {
+              borderColor: colors.secondary,
+              shadowColor: colors.secondary,
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.15,
+              shadowRadius: 6,
+              elevation: 3,
+            }
+          ]}
+          value={value}
+          onChangeText={onChangeText}
+          placeholder={opts.placeholder}
+          placeholderTextColor={colors.textSecondary + '80'}
+          keyboardType={opts.keyboardType || 'default'}
+          onFocus={() => setFocusedField(label)}
+          onBlur={() => setFocusedField(null)}
+        />
+      </View>
+    );
+  };
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]}>

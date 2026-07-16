@@ -14,6 +14,20 @@ export const printPrescription = async (
 ): Promise<void> => {
   const items = prescription.items || [];
 
+  const svgPaths = prescription.signatureData
+    ? prescription.signatureData.split('|||').filter(Boolean).map((p: string) => `<path d="${p}" fill="none" stroke="#000" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />`).join('')
+    : '';
+
+  const signatureHtml = svgPaths
+    ? `
+      <div style="text-align:right;margin-top:6px;margin-bottom:2px;">
+        <svg width="120" height="45" viewBox="0 0 320 180" style="display:inline-block;">
+          <g>${svgPaths}</g>
+        </svg>
+      </div>
+    `
+    : '';
+
   const medicineRows = items
     .map(
       (item: any, idx: number) => `
@@ -176,6 +190,7 @@ export const printPrescription = async (
       ${prescription.notes ? `<div class="notes"><strong>Notes:</strong> ${prescription.notes}</div>` : ''}
 
       <div class="doctor-sig">
+        ${signatureHtml}
         Dr. ${prescription.doctorName || ''}
       </div>
 
@@ -204,8 +219,6 @@ export const generatePrescriptionPdf = async (
 };
 
 const buildPrescriptionHtml = (prescription: any, clinic: Clinic): string => {
-  // Reuse the same HTML from printPrescription
-  // For brevity, this is a simplified version
   const items = prescription.items || [];
   const rows = items
     .map((item: any, idx: number) => `
@@ -217,6 +230,20 @@ const buildPrescriptionHtml = (prescription: any, clinic: Clinic): string => {
       </tr>
     `)
     .join('');
+
+  const svgPaths = prescription.signatureData
+    ? prescription.signatureData.split('|||').filter(Boolean).map((p: string) => `<path d="${p}" fill="none" stroke="#000" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />`).join('')
+    : '';
+
+  const signatureHtml = svgPaths
+    ? `
+      <div style="text-align:right;margin-top:6px;margin-bottom:2px;">
+        <svg width="120" height="45" viewBox="0 0 320 180" style="display:inline-block;">
+          <g>${svgPaths}</g>
+        </svg>
+      </div>
+    `
+    : '';
 
   return `
     <html><body style="font-family:sans-serif;padding:16px;font-size:12px;">
@@ -232,7 +259,8 @@ const buildPrescriptionHtml = (prescription: any, clinic: Clinic): string => {
         ${rows}
       </table>
       <p style="text-align:right;font-size:16px;font-weight:bold;">Total: ${formatCurrency(prescription.totalAmount || 0)}</p>
-      <br/><p style="text-align:right;">Dr. ${prescription.doctorName || ''}</p>
+      ${signatureHtml}
+      <p style="text-align:right;">Dr. ${prescription.doctorName || ''}</p>
       <p style="text-align:center;color:#888;font-size:10px;">${clinic.settings?.prescriptionFooter || 'Get well soon!'}</p>
     </body></html>
   `;
