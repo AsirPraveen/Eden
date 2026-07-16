@@ -7,7 +7,7 @@ export default {
     icon: "./assets/icon.png",
     scheme: "eden",
     userInterfaceStyle: "automatic",
-    newArchEnabled: false,
+    newArchEnabled: true,
     ios: {
       supportsTablet: true,
     },
@@ -23,12 +23,12 @@ export default {
       ],
       adaptiveIcon: {
         foregroundImage: "./assets/icon.png",
-        backgroundColor: "#1B4D3E",
+        backgroundColor: "#fffdee",
       },
     },
     web: {
       bundler: "metro",
-      favicon: "./assets/favicon.png",
+      favicon: "./assets/icon.png",
     },
     extra: {
       firebaseApiKey: process.env.FIREBASE_API_KEY ?? '',
@@ -38,7 +38,7 @@ export default {
       firebaseMessagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID ?? '',
       firebaseAppId: process.env.FIREBASE_APP_ID ?? '',
       eas: {
-        projectId: "",
+        projectId: "96be7c99-cd5e-4c24-877b-cd87799b343f",
       },
     },
     plugins: [
