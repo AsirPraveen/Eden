@@ -1,0 +1,159 @@
+rules_version = '2';
+
+// Eden - Firestore security rules.
+// Tenant isolation: every accounts/{accountId}/** read/write requires the
+// requester to be an active member of that account. Role checks gate the
+// sensitive writes. Clinic isolation: members with a restricted clinicIds
+// list (see Member.clinicIds - empty means "all clinics", e.g. the owner)
+// can only read/write documents whose clinicId is in that list, so two
+// clinics under the same practice never see each other's medicines, stock,
+// suppliers or purchases. Patients are shared across all clinics in a practice.
+//   firebase deploy --only firestore:rules
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function memberDoc(accountId) {
+      return get(/databases/$(database)/documents/accounts/$(accountId)/members/$(request.auth.uid));
+    }
+
+    function isMember(accountId) {
+      return signedIn()
+        && exists(/databases/$(database)/documents/accounts/$(accountId)/members/$(request.auth.uid))
+        && memberDoc(accountId).data.active == true;
+    }
+
+    function isManager(accountId) {
+      return isMember(accountId)
+        && memberDoc(accountId).data.role in ['owner', 'doctor'];
+    }
+
+    function isOwner(accountId) {
+      return isMember(accountId) && memberDoc(accountId).data.role == 'owner';
+    }
+
+    // Empty clinicIds means unrestricted (used for the owner); otherwise the
+    // member only has access to the clinics listed on their member doc.
+    function hasClinicAccess(accountId, clinicId) {
+      return isMember(accountId)
+        && (memberDoc(accountId).data.clinicIds.size() == 0
+            || clinicId in memberDoc(accountId).data.clinicIds);
+    }
+
+    // Users may read/write only their own user doc.
+    match /users/{uid} {
+      allow read, write: if signedIn() && request.auth.uid == uid;
+    }
+
+    // Invites: managers create; any signed-in user may read a specific code
+    // (needed to join) and mark it used for themselves.
+    match /invites/{code} {
+      allow read: if signedIn();
+      allow create: if signedIn() && isManager(request.resource.data.accountId);
+      allow update: if signedIn()
+        && resource.data.usedBy == null
+        && request.resource.data.usedBy == request.auth.uid
+        && request.resource.data.accountId == resource.data.accountId
+        && request.resource.data.role == resource.data.role;
+      allow delete: if signedIn() && isManager(resource.data.accountId);
+    }
+
+    match /accounts/{accountId} {
+      // Creating an account: the creator must set themselves as owner.
+      allow create: if signedIn() && request.resource.data.ownerUid == request.auth.uid;
+      allow read: if isMember(accountId);
+      allow update: if isOwner(accountId)
+        || (isManager(accountId)
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['staffPermissions']));
+      allow delete: if false; // never hard-delete an account from the client
+
+      match /members/{uid} {
+        allow read: if isMember(accountId) || (signedIn() && request.auth.uid == uid);
+        // Owner bootstrap (self, during account creation) or invite join (self).
+        allow create: if signedIn() && request.auth.uid == uid;
+        allow update: if isOwner(accountId)
+          || (isManager(accountId) && uid != get(/databases/$(database)/documents/accounts/$(accountId)).data.ownerUid)
+          || (signedIn() && request.auth.uid == uid
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['photoUrl']))
+          || (signedIn() && request.auth.uid == uid
+              && isManager(accountId)
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['signatureUrl']));
+        allow delete: if isOwner(accountId) && uid != request.auth.uid;
+      }
+
+      match /clinics/{clinicId} {
+        allow read: if isMember(accountId);
+        // First clinic is created in the same transaction as the account.
+        allow create: if signedIn()
+          && (isManager(accountId)
+              || request.auth.uid == getAfter(/databases/$(database)/documents/accounts/$(accountId)).data.ownerUid);
+        allow update: if isManager(accountId);
+        allow delete: if false; // soft-delete via active flag
+      }
+
+      match /suppliers/{id} {
+        allow read: if hasClinicAccess(accountId, resource.data.clinicId);
+        allow create: if hasClinicAccess(accountId, request.resource.data.clinicId);
+        allow update: if hasClinicAccess(accountId, resource.data.clinicId)
+          && hasClinicAccess(accountId, request.resource.data.clinicId);
+        allow delete: if isManager(accountId) && hasClinicAccess(accountId, resource.data.clinicId);
+      }
+
+      match /medicines/{id} {
+        allow read: if hasClinicAccess(accountId, resource.data.clinicId);
+        allow create: if hasClinicAccess(accountId, request.resource.data.clinicId);
+        // Price and threshold edits are manager-only; clinic access always required.
+        allow update: if hasClinicAccess(accountId, resource.data.clinicId)
+          && hasClinicAccess(accountId, request.resource.data.clinicId)
+          && (isManager(accountId) || request.resource.data.defaultPrice == resource.data.defaultPrice);
+        allow delete: if false; // soft-delete via active flag
+      }
+
+      match /stock/{id} {
+        allow read: if hasClinicAccess(accountId, resource.data.clinicId);
+        allow create: if hasClinicAccess(accountId, request.resource.data.clinicId);
+        allow update: if hasClinicAccess(accountId, resource.data.clinicId)
+          && hasClinicAccess(accountId, request.resource.data.clinicId);
+        allow delete: if false;
+      }
+
+      match /purchases/{id} {
+        allow read: if hasClinicAccess(accountId, resource.data.clinicId);
+        allow create: if hasClinicAccess(accountId, request.resource.data.clinicId);
+        allow update: if hasClinicAccess(accountId, resource.data.clinicId)
+          // Staff may only add payments; core fields are immutable.
+          && request.resource.data.totalAmount == resource.data.totalAmount
+          && request.resource.data.items == resource.data.items
+          && request.resource.data.supplierId == resource.data.supplierId;
+        allow delete: if isManager(accountId) && hasClinicAccess(accountId, resource.data.clinicId);
+      }
+
+      match /patients/{id} {
+        allow read: if isMember(accountId);
+        allow create: if isMember(accountId);
+        allow update: if isMember(accountId);
+        allow delete: if isManager(accountId); // DPDP: patient data deletion
+      }
+
+      match /visits/{id} {
+        allow read: if hasClinicAccess(accountId, resource.data.clinicId);
+        allow create: if hasClinicAccess(accountId, request.resource.data.clinicId);
+        // Visits are immutable except marking printedAt.
+        allow update: if hasClinicAccess(accountId, resource.data.clinicId)
+          && request.resource.data.items == resource.data.items
+          && request.resource.data.totalAmount == resource.data.totalAmount;
+        allow delete: if isManager(accountId) && hasClinicAccess(accountId, resource.data.clinicId);
+      }
+
+      match /ledger/{id} {
+        allow read: if hasClinicAccess(accountId, resource.data.clinicId)
+          && (isManager(accountId) || resource.data.byUid == request.auth.uid);
+        allow create: if hasClinicAccess(accountId, request.resource.data.clinicId);
+        allow update, delete: if false; // audit trail is append-only
+      }
+    }
+  }
+}

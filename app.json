@@ -1,0 +1,79 @@
+{
+  "expo": {
+    "name": "Eden",
+    "slug": "Eden",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "eden",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "icon": "./assets/images/icon.png"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#F5EBD6",
+        "foregroundImage": "./assets/images/android-icon-foreground.png",
+        "backgroundImage": "./assets/images/android-icon-background.png",
+        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.BLUETOOTH",
+        "android.permission.BLUETOOTH_ADMIN",
+        "android.permission.BLUETOOTH_CONNECT",
+        "android.permission.BLUETOOTH_SCAN"
+      ],
+      "package": "com.jvn.Eden",
+      "softwareKeyboardLayoutMode": "resize"
+    },
+    "web": {
+      "output": "static",
+      "favicon": "./assets/images/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#F5EBD6",
+          "image": "./assets/images/splash-full.png",
+          "resizeMode": "cover",
+          "enableFullScreenImage_legacy": true,
+          "imageWidth": 1284,
+          "android": {
+            "image": "./assets/images/splash-full.png",
+            "resizeMode": "cover",
+            "backgroundColor": "#F5EBD6"
+          },
+          "ios": {
+            "backgroundColor": "#F5EBD6",
+            "enableFullScreenImage_legacy": true,
+            "resizeMode": "cover"
+          }
+        }
+      ],
+      "expo-sharing",
+      [
+        "react-native-share",
+        {
+          "android": [
+            "com.whatsapp",
+            "com.whatsapp.w4b"
+          ],
+          "ios": [
+            "whatsapp"
+          ],
+          "enableBase64ShareAndroid": true
+        }
+      ],
+      "@react-native-community/datetimepicker",
+      "expo-asset",
+      "expo-build-properties"
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    }
+  }
+}
