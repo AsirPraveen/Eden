@@ -23,7 +23,7 @@ export default {
       ],
       adaptiveIcon: {
         foregroundImage: "./assets/icon.png",
-        backgroundColor: "#fffdee",
+        backgroundColor: "#ffffffff",
       },
     },
     web: {
@@ -50,7 +50,7 @@ export default {
           image: "./assets/icon.png",
           imageWidth: 200,
           resizeMode: "contain",
-          backgroundColor: "#1B4D3E",
+          backgroundColor: "#ffffffff",
         },
       ],
     ],
