@@ -35,3 +35,7 @@ export const visitsCol = (accountId: string) => collection(db, "accounts", accou
 export const visitDoc = (accountId: string, id: string) =>
   doc(db, "accounts", accountId, "visits", id);
 export const ledgerCol = (accountId: string) => collection(db, "accounts", accountId, "ledger");
+export const treatmentsCol = (accountId: string) =>
+  collection(db, "accounts", accountId, "treatments");
+export const treatmentDoc = (accountId: string, id: string) =>
+  doc(db, "accounts", accountId, "treatments", id);

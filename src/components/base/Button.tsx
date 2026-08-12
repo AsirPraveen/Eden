@@ -1,5 +1,5 @@
 import React from "react";
-import { ActivityIndicator, Pressable, StyleSheet, ViewStyle } from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet, TextStyle, ViewStyle } from "react-native";
 import { useTheme } from "../../theme/ThemeProvider";
 import { radius, spacing, typography } from "../../theme/tokens";
 import { Text } from "./Text";
@@ -13,6 +13,7 @@ export function Button({
   disabled,
   loading,
   style,
+  textStyle,
   compact,
 }: {
   title: string;
@@ -21,6 +22,7 @@ export function Button({
   disabled?: boolean;
   loading?: boolean;
   style?: ViewStyle;
+  textStyle?: TextStyle;
   compact?: boolean;
 }) {
   const { colors } = useTheme();
@@ -58,13 +60,14 @@ export function Button({
       ]}
     >
       {loading ? (
-        <ActivityIndicator size="small" color={textColor} />
+        <ActivityIndicator size="small" color={textStyle?.color ?? textColor} />
       ) : (
         <Text
           style={{
             color: textColor,
             fontWeight: typography.weight.semibold,
             fontSize: compact ? typography.size.sm : typography.size.md,
+            ...textStyle,
           }}
         >
           {title}

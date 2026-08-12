@@ -4,7 +4,7 @@ import { useEffect, useRef } from "react";
 import {
   cancelExpiryReminders,
   ensureNotificationPermission,
-  notifyLowStock,
+  notifyLowStockSummary,
   scheduleDailyLowStockDigest,
   scheduleExpiryReminders,
 } from "../services/notifications";
@@ -21,7 +21,7 @@ function todayKey(): string {
 
 /**
  * Watches the active clinic's stock and fires local notifications for
- * low-stock (event-driven, deduped per day) and upcoming batch expiry
+ * low-stock (single summary, deduped per day) and upcoming batch expiry
  * (scheduled ahead, like due-payment reminders).
  */
 export function useNotificationWatcher(): void {
@@ -57,25 +57,32 @@ export function useNotificationWatcher(): void {
         const medicine = medicineById.get(s.medicineId);
         if (!medicine) continue;
 
-        // Low stock - immediate, deduped per day, plus fold into the daily digest snapshot.
+        // Low stock — collect into list for summary notification + daily digest.
         const threshold = medicine.lowStockThreshold ?? 0;
         if (s.qty <= threshold) {
           lowStockItems.push({ name: medicine.name, qty: s.qty, unit: medicine.unit });
-
-          const dedupeKey = `notif:lowstock:${medicine.id}:${todayKey()}`;
-          const alreadyNotified = await AsyncStorage.getItem(dedupeKey).catch(() => null);
-          if (!alreadyNotified) {
-            await notifyLowStock(medicine.id, medicine.name, s.qty, medicine.unit).catch(() => { });
-            await AsyncStorage.setItem(dedupeKey, "1").catch(() => { });
-          }
         }
 
-        // Expiry - scheduled ahead, one entry per live batch.
+        // Expiry — scheduled ahead, one entry per live batch.
         for (const batch of s.batches || []) {
           if (batch.qty <= 0 || !batch.expiry || isExpired(batch.expiry)) continue;
           const key = `${medicine.id}:${batch.batchNo}`;
           seenBatchKeys.add(key);
           await scheduleExpiryReminders(medicine.id, medicine.name, batch).catch(() => { });
+        }
+      }
+
+      // #21: Single summary notification instead of one per medicine.
+      // Deduped per day so it only fires once.
+      if (lowStockItems.length > 0) {
+        const dedupeKey = `notif:lowstock_summary:${todayKey()}`;
+        const alreadyNotified = await AsyncStorage.getItem(dedupeKey).catch(() => null);
+        if (!alreadyNotified) {
+          await notifyLowStockSummary(
+            lowStockItems.length,
+            lowStockItems.map((i) => i.name)
+          ).catch(() => { });
+          await AsyncStorage.setItem(dedupeKey, "1").catch(() => { });
         }
       }
 
@@ -94,3 +101,4 @@ export function useNotificationWatcher(): void {
     })();
   }, [accountId, clinicId, medicines, stock]);
 }
+

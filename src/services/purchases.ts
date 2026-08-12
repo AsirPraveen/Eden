@@ -32,6 +32,8 @@ export async function recordPurchase(params: {
   dueDate?: Date;
   paidNow: number;
   byUid: string;
+  invoiceTotal?: number;
+  gstAmount?: number;
 }): Promise<string> {
   const { accountId, clinicId, items } = params;
   const totalAmount = items.reduce((sum, it) => sum + it.qty * it.costPrice, 0);
@@ -65,6 +67,8 @@ export async function recordPurchase(params: {
       status,
       createdBy: params.byUid,
       createdAt: serverTimestamp(),
+      invoiceTotal: params.invoiceTotal,
+      gstAmount: params.gstAmount,
     });
 
     items.forEach((it, i) => {

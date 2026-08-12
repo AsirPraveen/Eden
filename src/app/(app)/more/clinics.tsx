@@ -1,6 +1,6 @@
 import { addDoc, serverTimestamp, updateDoc } from "firebase/firestore";
 import { useState } from "react";
-import { Alert, Image, Pressable, View } from "react-native";
+import { Alert, Image, Pressable, Switch, View } from "react-native";
 import { Badge, Button, Card, IconCircle, Input, ListRow, Screen, Text } from "../../../components/base";
 import { ColorPickerModal } from "../../../components/ColorPickerModal";
 import { deleteCloudinaryImage, isCloudinaryConfigured, pickAndUploadImage, thumb } from "../../../services/cloudinary";
@@ -30,6 +30,8 @@ export default function Clinics() {
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [primaryColor, setPrimaryColor] = useState<string | null>(null);
   const [accentColor, setAccentColor] = useState<string | null>(null);
+  const [discountEnabled, setDiscountEnabled] = useState(false);
+  const [discountPercent, setDiscountPercent] = useState("");
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [pickerTarget, setPickerTarget] = useState<"primary" | "accent" | null>(null);
@@ -47,6 +49,8 @@ export default function Clinics() {
       setLogoUrl(null);
       setPrimaryColor(null);
       setAccentColor(null);
+      setDiscountEnabled(false);
+      setDiscountPercent("");
     } else {
       setName(c.name);
       setAddress(c.address);
@@ -56,6 +60,8 @@ export default function Clinics() {
       setLogoUrl(c.logoUrl ?? null);
       setPrimaryColor(c.primaryColor ?? null);
       setAccentColor(c.accentColor ?? null);
+      setDiscountEnabled(c.discountEnabled ?? false);
+      setDiscountPercent(c.discountPercent ? String(c.discountPercent) : "");
     }
   };
 
@@ -81,6 +87,8 @@ export default function Clinics() {
         logoUrl,
         primaryColor: primaryColor?.trim() || null,
         accentColor: accentColor?.trim() || null,
+        discountEnabled,
+        discountPercent: discountEnabled ? parseFloat(discountPercent) || 0 : 0,
       };
       if (editing === "new") {
         await addDoc(clinicsCol(accountId), {
@@ -315,6 +323,29 @@ export default function Clinics() {
             />
           </Pressable>
         </View>
+
+        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: spacing.md, marginTop: spacing.md }}>
+          <View style={{ flex: 1 }}>
+            <Text variant="body" style={{ fontWeight: "600" }}>Enable prescription discount</Text>
+            <Text variant="caption" color={colors.textSecondary}>Allow default discount on bills</Text>
+          </View>
+          <Switch
+            value={discountEnabled}
+            onValueChange={setDiscountEnabled}
+            trackColor={{ false: colors.border, true: colors.accentSoft }}
+            thumbColor={discountEnabled ? colors.cta : colors.surface}
+          />
+        </View>
+
+        {discountEnabled && (
+          <Input
+            label="Default discount (%)"
+            value={discountPercent}
+            onChangeText={setDiscountPercent}
+            keyboardType="decimal-pad"
+            placeholder="0.0"
+          />
+        )}
 
         <ColorPickerModal
           visible={pickerTarget === "primary"}

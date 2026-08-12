@@ -95,7 +95,7 @@ service cloud.firestore {
       }
 
       match /suppliers/{id} {
-        allow read: if hasClinicAccess(accountId, resource.data.clinicId);
+        allow read: if resource == null || hasClinicAccess(accountId, resource.data.clinicId);
         allow create: if hasClinicAccess(accountId, request.resource.data.clinicId);
         allow update: if hasClinicAccess(accountId, resource.data.clinicId)
           && hasClinicAccess(accountId, request.resource.data.clinicId);
@@ -103,7 +103,7 @@ service cloud.firestore {
       }
 
       match /medicines/{id} {
-        allow read: if hasClinicAccess(accountId, resource.data.clinicId);
+        allow read: if resource == null || hasClinicAccess(accountId, resource.data.clinicId);
         allow create: if hasClinicAccess(accountId, request.resource.data.clinicId);
         // Price and threshold edits are manager-only; clinic access always required.
         allow update: if hasClinicAccess(accountId, resource.data.clinicId)
@@ -113,7 +113,7 @@ service cloud.firestore {
       }
 
       match /stock/{id} {
-        allow read: if hasClinicAccess(accountId, resource.data.clinicId);
+        allow read: if resource == null || hasClinicAccess(accountId, resource.data.clinicId);
         allow create: if hasClinicAccess(accountId, request.resource.data.clinicId);
         allow update: if hasClinicAccess(accountId, resource.data.clinicId)
           && hasClinicAccess(accountId, request.resource.data.clinicId);
@@ -121,7 +121,7 @@ service cloud.firestore {
       }
 
       match /purchases/{id} {
-        allow read: if hasClinicAccess(accountId, resource.data.clinicId);
+        allow read: if resource == null || hasClinicAccess(accountId, resource.data.clinicId);
         allow create: if hasClinicAccess(accountId, request.resource.data.clinicId);
         allow update: if hasClinicAccess(accountId, resource.data.clinicId)
           // Staff may only add payments; core fields are immutable.
@@ -139,7 +139,7 @@ service cloud.firestore {
       }
 
       match /visits/{id} {
-        allow read: if hasClinicAccess(accountId, resource.data.clinicId);
+        allow read: if resource == null || hasClinicAccess(accountId, resource.data.clinicId);
         allow create: if hasClinicAccess(accountId, request.resource.data.clinicId);
         // Visits are immutable except marking printedAt.
         allow update: if hasClinicAccess(accountId, resource.data.clinicId)
@@ -149,8 +149,8 @@ service cloud.firestore {
       }
 
       match /ledger/{id} {
-        allow read: if hasClinicAccess(accountId, resource.data.clinicId)
-          && (isManager(accountId) || resource.data.byUid == request.auth.uid);
+        allow read: if resource == null || (hasClinicAccess(accountId, resource.data.clinicId)
+          && (isManager(accountId) || resource.data.byUid == request.auth.uid));
         allow create: if hasClinicAccess(accountId, request.resource.data.clinicId);
         allow update, delete: if false; // audit trail is append-only
       }

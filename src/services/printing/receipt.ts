@@ -75,10 +75,28 @@ export function buildVisitReceipt(visit: Visit, clinic: Clinic): string {
     p.row(`   ${it.qty} x Rs.${it.price}`, `Rs.${(it.qty * it.price).toFixed(2)}`);
   });
 
+  const medCount = visit.items.length;
+  if ((visit.treatments?.length ?? 0) > 0) {
+    p.bold(true).line("Treatments").bold(false);
+    visit.treatments!.forEach((t, i) => {
+      p.bold(true).wrapped(`${medCount + i + 1}. ${t.treatmentName}`).bold(false);
+      p.row(`   1 x Rs.${t.price}`, `Rs.${t.price.toFixed(2)}`);
+    });
+  }
+
   p.rule();
-  if (visit.consultationFee > 0) {
+  const hasSubtotals = visit.consultationFee > 0 || (visit.treatmentsAmount ?? 0) > 0 || (visit.discountAmount ?? 0) > 0;
+  if (hasSubtotals) {
     p.row("Medicines", `Rs.${visit.medicinesAmount.toFixed(2)}`);
-    p.row("Consultation", `Rs.${visit.consultationFee.toFixed(2)}`);
+    if ((visit.treatmentsAmount ?? 0) > 0) {
+      p.row("Treatments", `Rs.${visit.treatmentsAmount!.toFixed(2)}`);
+    }
+    if (visit.consultationFee > 0) {
+      p.row("Consultation", `Rs.${visit.consultationFee.toFixed(2)}`);
+    }
+    if ((visit.discountAmount ?? 0) > 0) {
+      p.row(`Discount (${visit.discountPercent ?? 0}%)`, `-Rs.${visit.discountAmount!.toFixed(2)}`);
+    }
   }
   p.bold(true).row("TOTAL", `Rs.${visit.totalAmount.toFixed(2)}`).bold(false);
   if (visit.paymentMode !== "unpaid") p.row("Paid by", visit.paymentMode.toUpperCase());
@@ -124,9 +142,27 @@ export function buildVisitA4Html(
     )
     .join("");
 
+  const treatmentRows = (visit.treatments || [])
+    .map(
+      (t, i) => `
+      <tr>
+        <td class="num">${visit.items.length + i + 1}</td>
+        <td>
+          <div class="med-name">${escapeHtml(t.treatmentName)}</div>
+          <div class="dose">Service / Treatment</div>
+        </td>
+        <td class="center">1</td>
+        <td class="right">${formatMoney(t.price)}</td>
+        <td class="right">${formatMoney(t.price)}</td>
+      </tr>`
+    )
+    .join("");
+
   const footerDate = formatDateTime(visit.date.toDate());
   const primary = theme.primary;
   const accent = theme.accent;
+
+  const hasSubtotals = visit.consultationFee > 0 || (visit.treatmentsAmount ?? 0) > 0 || (visit.discountAmount ?? 0) > 0;
 
   return `<!DOCTYPE html>
 <html><head><meta charset="utf-8"/>
@@ -193,11 +229,16 @@ export function buildVisitA4Html(
         <th class="right">Amount</th>
       </tr>
     </thead>
-    <tbody>${medicineRows}</tbody>
+    <tbody>${medicineRows}${treatmentRows}</tbody>
   </table>
 
   <table class="totals">
-    ${visit.consultationFee > 0 ? `<tr><td>Medicines</td><td class="right">${formatMoney(visit.medicinesAmount)}</td></tr><tr><td>Consultation</td><td class="right">${formatMoney(visit.consultationFee)}</td></tr>` : ""}
+    ${hasSubtotals ? `
+      <tr><td>Medicines</td><td class="right">${formatMoney(visit.medicinesAmount)}</td></tr>
+      ${(visit.treatmentsAmount ?? 0) > 0 ? `<tr><td>Treatments</td><td class="right">${formatMoney(visit.treatmentsAmount!)}</td></tr>` : ""}
+      ${visit.consultationFee > 0 ? `<tr><td>Consultation</td><td class="right">${formatMoney(visit.consultationFee)}</td></tr>` : ""}
+      ${(visit.discountAmount ?? 0) > 0 ? `<tr><td>Discount (${visit.discountPercent ?? 0}%)</td><td class="right">-${formatMoney(visit.discountAmount!)}</td></tr>` : ""}
+    ` : ""}
     <tr class="grand"><td>Total (${visit.paymentMode.toUpperCase()})</td><td class="right">${formatMoney(visit.totalAmount)}</td></tr>
   </table>
 
@@ -244,6 +285,17 @@ export function buildVisitThermalHtml(
     )
     .join("");
 
+  const treatmentRows = (visit.treatments || [])
+    .map(
+      (t, i) => `
+      <tr><td colspan="2" class="med">${visit.items.length + i + 1}. ${escapeHtml(t.treatmentName)}</td></tr>
+      <tr><td colspan="2" class="dose">Service / Treatment</td></tr>
+      <tr><td class="qty">1 × ${formatMoney(t.price)}</td><td class="amt">${formatMoney(t.price)}</td></tr>`
+    )
+    .join("");
+
+  const hasSubtotals = visit.consultationFee > 0 || (visit.treatmentsAmount ?? 0) > 0 || (visit.discountAmount ?? 0) > 0;
+
   return `<!DOCTYPE html>
 <html><head><meta charset="utf-8"/>
 <style>
@@ -280,8 +332,13 @@ export function buildVisitThermalHtml(
   ${visit.diagnosis ? `<div class="meta">Dx: ${escapeHtml(visit.diagnosis)}</div>` : ""}
   <hr/>
   <div style="font-weight:700">℞</div>
-  <table>${rows}
-    ${visit.consultationFee > 0 ? `<tr><td>Medicines</td><td class="amt">${formatMoney(visit.medicinesAmount)}</td></tr><tr><td>Consultation</td><td class="amt">${formatMoney(visit.consultationFee)}</td></tr>` : ""}
+  <table>${rows}${treatmentRows}
+    ${hasSubtotals ? `
+      <tr><td>Medicines</td><td class="amt">${formatMoney(visit.medicinesAmount)}</td></tr>
+      ${(visit.treatmentsAmount ?? 0) > 0 ? `<tr><td>Treatments</td><td class="amt">${formatMoney(visit.treatmentsAmount!)}</td></tr>` : ""}
+      ${visit.consultationFee > 0 ? `<tr><td>Consultation</td><td class="amt">${formatMoney(visit.consultationFee)}</td></tr>` : ""}
+      ${(visit.discountAmount ?? 0) > 0 ? `<tr><td>Discount (${visit.discountPercent ?? 0}%)</td><td class="amt">-${formatMoney(visit.discountAmount!)}</td></tr>` : ""}
+    ` : ""}
     <tr class="total"><td>TOTAL</td><td class="total-amt">${formatMoney(visit.totalAmount)}</td></tr>
   </table>
   <hr/>

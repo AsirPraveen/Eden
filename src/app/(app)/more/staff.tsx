@@ -1,15 +1,15 @@
 import { Ionicons } from "@expo/vector-icons";
 import Constants from "expo-constants";
 import { deleteDoc, query, serverTimestamp, setDoc, Timestamp, updateDoc, where } from "firebase/firestore";
-import { useEffect, useMemo, useState } from "react";
-import { Alert, Pressable, Share, View } from "react-native";
+import React, { useEffect, useMemo, useState } from "react";
+import { Alert, Modal, Pressable, Share, StyleSheet, View } from "react-native";
 import { Avatar, Badge, Button, Card, EmptyState, ListRow, Screen, SelectChip, Text } from "../../../components/base";
 import { useCollection } from "../../../hooks/useFirestore";
 import { inviteDoc, invitesCol, memberDoc, membersCol } from "../../../services/paths";
 import { useCanManage, useSession } from "../../../stores/useSession";
 import { defaultBranding } from "../../../theme/branding";
 import { useTheme } from "../../../theme/ThemeProvider";
-import { spacing } from "../../../theme/tokens";
+import { radius, spacing } from "../../../theme/tokens";
 import { Invite, Member, Role } from "../../../types/models";
 
 const APP_NAME = Constants.expoConfig?.name ?? defaultBranding.appName;
@@ -43,6 +43,10 @@ export default function Staff() {
   const [inviteClinicIds, setInviteClinicIds] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
 
+  // Clinic access edit states
+  const [editingMember, setEditingMember] = useState<Member | null>(null);
+  const [editMemberClinicIds, setEditMemberClinicIds] = useState<string[]>([]);
+
   const clinicNameById = new Map(clinics.map((c) => [c.id, c.name]));
 
   useEffect(() => {
@@ -55,8 +59,10 @@ export default function Staff() {
     setInviteClinicIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   };
 
-  const clinicLabel = (ids: string[]) =>
-    ids.map((id) => clinicNameById.get(id) ?? "Clinic").join(", ");
+  const clinicLabel = (ids: string[]) => {
+    if (!ids || ids.length === 0) return "All clinics";
+    return ids.map((id) => clinicNameById.get(id) ?? "Clinic").join(", ");
+  };
 
   const visibleMembers = useMemo(
     () => (isStaffViewer ? members.filter((m) => m.role === "owner" || m.role === "doctor") : members),
@@ -120,6 +126,11 @@ export default function Staff() {
     );
   };
 
+  const startEditAccess = (m: Member) => {
+    setEditingMember(m);
+    setEditMemberClinicIds(m.clinicIds || []);
+  };
+
   return (
     <Screen>
       <Card style={{ padding: 0, marginBottom: spacing.md }}>
@@ -134,8 +145,9 @@ export default function Staff() {
               key={m.uid}
               left={<Avatar name={m.name || m.email} photoUrl={m.photoUrl} size={40} />}
               title={m.name || m.email}
-              subtitle={[m.email, m.clinicIds.length > 0 ? clinicLabel(m.clinicIds) : "All clinics"].filter(Boolean).join(" · ")}
-              chevron={false}
+              subtitle={[m.email, m.clinicIds && m.clinicIds.length > 0 ? clinicLabel(m.clinicIds) : "All clinics"].filter(Boolean).join(" · ")}
+              chevron={canModify}
+              onPress={canModify ? () => startEditAccess(m) : undefined}
               right={
                 isStaffViewer ? (
                   <Badge text={m.role} tone={m.role === "owner" ? "accent" : "neutral"} />
@@ -227,6 +239,88 @@ export default function Staff() {
       {canManage && members.length <= 1 && openInvites.length === 0 && (
         <EmptyState title="" message="Working with another doctor or an assistant? Invite them with a code." />
       )}
+
+      {/* Member Clinic Access Edit Modal */}
+      <Modal
+        visible={editingMember !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setEditingMember(null)}
+      >
+        <View style={styles.modalBackdrop}>
+          <Card style={styles.modalCard}>
+            <Text variant="subheading" style={{ marginBottom: spacing.sm }}>
+              Edit clinic access
+            </Text>
+            <Text variant="body" style={{ fontWeight: "600", marginBottom: spacing.xs }}>
+              {editingMember?.name || editingMember?.email}
+            </Text>
+            <Text variant="caption" color={colors.textSecondary} style={{ marginBottom: spacing.lg }}>
+              Role: {editingMember?.role}
+            </Text>
+
+            <Text variant="caption" style={{ marginBottom: spacing.sm }}>
+              Clinic access
+            </Text>
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginBottom: spacing.lg }}>
+              {clinics.map((c) => {
+                const selected = editMemberClinicIds.includes(c.id);
+                return (
+                  <SelectChip
+                    key={c.id}
+                    icon="medkit-outline"
+                    label={c.name}
+                    selected={selected}
+                    onPress={() => {
+                      setEditMemberClinicIds((prev) =>
+                        prev.includes(c.id) ? prev.filter((x) => x !== c.id) : [...prev, c.id]
+                      );
+                    }}
+                  />
+                );
+              })}
+            </View>
+            <Text variant="caption" color={colors.textSecondary} style={{ marginBottom: spacing.lg }}>
+              Select the clinics this member is allowed to access. (Selecting all clinics grants access to all clinics).
+            </Text>
+
+            <View style={{ flexDirection: "row", gap: spacing.md }}>
+              <Button title="Cancel" variant="ghost" onPress={() => setEditingMember(null)} style={{ flex: 1 }} />
+              <Button
+                title="Save"
+                onPress={async () => {
+                  if (!accountId || !editingMember) return;
+                  setBusy(true);
+                  try {
+                    const finalIds = editMemberClinicIds.length === clinics.length ? [] : editMemberClinicIds;
+                    await updateDoc(memberDoc(accountId, editingMember.uid), { clinicIds: finalIds });
+                    setEditingMember(null);
+                  } catch (e) {
+                    Alert.alert("Failed to update access", (e as Error).message);
+                  } finally {
+                    setBusy(false);
+                  }
+                }}
+                style={{ flex: 1 }}
+              />
+            </View>
+          </Card>
+        </View>
+      </Modal>
     </Screen>
   );
 }
+
+const styles = StyleSheet.create({
+  modalBackdrop: {
+    flex: 1,
+    justifyContent: "center",
+    backgroundColor: "rgba(0,0,0,0.45)",
+    padding: spacing.lg,
+  },
+  modalCard: {
+    maxWidth: 400,
+    width: "100%",
+    alignSelf: "center",
+  },
+});

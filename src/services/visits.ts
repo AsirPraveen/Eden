@@ -1,5 +1,5 @@
 import { collection, doc, runTransaction, serverTimestamp, Timestamp } from "firebase/firestore";
-import { Batch, StockDoc, Visit, VisitItem } from "../types/models";
+import { Batch, StockDoc, Visit, VisitItem, VisitTreatment } from "../types/models";
 import { db } from "./firebase";
 import { ledgerCol, patientDoc, stockDoc } from "./paths";
 
@@ -40,6 +40,7 @@ function deductFromBatches(batches: Batch[], qty: number, targetBatchNo?: string
  * Save a visit/prescription: creates the visit doc, decrements stock (FEFO),
  * updates patient's lastVisitAt, writes a ledger entry - atomically.
  * Allows negative-stock override only when `allowInsufficient` is true.
+ * Skips stock deduction for "Other" (unlisted) medicines (id starts with __other__).
  */
 export async function saveVisit(params: {
   accountId: string;
@@ -52,19 +53,31 @@ export async function saveVisit(params: {
   paymentMode: Visit["paymentMode"];
   byUid: string;
   allowInsufficient?: boolean;
+  /** #13: Service-based treatments (no stock tracking). */
+  treatments?: VisitTreatment[];
+  treatmentsAmount?: number;
+  /** #2: Per-prescription discount. */
+  discountPercent?: number;
+  discountAmount?: number;
 }): Promise<string> {
   const { accountId, clinicId, items } = params;
   const medicinesAmount = items.reduce((s, it) => s + it.qty * it.price, 0);
-  const totalAmount = medicinesAmount + params.consultationFee;
+  const treatmentsAmount = params.treatmentsAmount ?? 0;
+  const discountAmount = params.discountAmount ?? 0;
+  const totalAmount = medicinesAmount + treatmentsAmount + params.consultationFee - discountAmount;
   const visitRef = doc(collection(db, "accounts", accountId, "visits"));
 
+  // #3: Separate items into stock-tracked and "other" (unlisted)
+  const stockItems = items.filter((it) => !it.medicineId.startsWith("__other__"));
+  const allItems = items; // All items saved to visit doc
+
   await runTransaction(db, async (tx) => {
-    const stockRefs = items.map((it) => stockDoc(accountId, clinicId, it.medicineId));
+    const stockRefs = stockItems.map((it) => stockDoc(accountId, clinicId, it.medicineId));
     const stockSnaps = await Promise.all(stockRefs.map((r) => tx.get(r)));
 
-    // Validate stock first
+    // Validate stock first (only for real medicines, not "other")
     if (!params.allowInsufficient) {
-      items.forEach((it, i) => {
+      stockItems.forEach((it, i) => {
         const have = stockSnaps[i].exists() ? (stockSnaps[i].data() as StockDoc).qty : 0;
         if (have < it.qty) {
           throw new Error(`INSUFFICIENT_STOCK:${it.medicineName}:${have}`);
@@ -78,16 +91,25 @@ export async function saveVisit(params: {
       patientName: params.patientName,
       date: Timestamp.fromDate(new Date()),
       diagnosis: params.diagnosis.trim(),
-      items,
+      items: allItems,
       consultationFee: params.consultationFee,
       medicinesAmount,
       totalAmount,
       paymentMode: params.paymentMode,
       printedAt: null,
       createdBy: params.byUid,
+      // #13: Treatments
+      ...(params.treatments && params.treatments.length > 0
+        ? { treatments: params.treatments, treatmentsAmount }
+        : {}),
+      // #2: Discount
+      ...(params.discountPercent && params.discountPercent > 0
+        ? { discountPercent: params.discountPercent, discountAmount }
+        : {}),
     });
 
-    items.forEach((it, i) => {
+    // Deduct stock only for real medicines (not "other")
+    stockItems.forEach((it, i) => {
       const snap = stockSnaps[i];
       if (snap.exists()) {
         const data = snap.data() as StockDoc;
@@ -118,7 +140,7 @@ export async function saveVisit(params: {
       refId: visitRef.id,
       clinicId,
       summary: `Prescription for ${params.patientName}`,
-      medicineDeltas: items.map((it) => ({
+      medicineDeltas: stockItems.map((it) => ({
         medicineId: it.medicineId,
         medicineName: it.medicineName,
         delta: -it.qty,
@@ -143,6 +165,9 @@ export async function adjustStock(params: {
   byUid: string;
   targetBatchNo?: string;
 }): Promise<void> {
+  if (isNaN(params.delta) || params.delta === 0) {
+    throw new Error("Enter a valid quantity to adjust.");
+  }
   const { accountId, clinicId, medicineId } = params;
   const ref = stockDoc(accountId, clinicId, medicineId);
 

@@ -6,6 +6,7 @@ export default function PatientsLayout() {
   const { colors } = useTheme();
   return (
     <Stack
+      initialRouteName="index"
       screenOptions={{
         headerStyle: { backgroundColor: colors.surface },
         headerTintColor: colors.text,

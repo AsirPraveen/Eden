@@ -16,6 +16,7 @@ export function PickerModal({
   onClose,
   onCreateNew,
   createLabel,
+  footer,
 }: {
   visible: boolean;
   title: string;
@@ -24,6 +25,8 @@ export function PickerModal({
   onClose: () => void;
   onCreateNew?: (searchText: string) => void;
   createLabel?: string;
+  /** Optional footer rendered below the list (e.g. inline create forms). */
+  footer?: React.ReactNode;
 }) {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
@@ -63,7 +66,8 @@ export function PickerModal({
           )}
           ListEmptyComponent={<EmptyState title="No matches" />}
         />
-        {onCreateNew && (
+        {footer}
+        {onCreateNew && !footer && (
           <View style={{ padding: spacing.lg, paddingBottom: insets.bottom + spacing.lg }}>
             <Button
               title={createLabel ?? "Add new"}
@@ -90,3 +94,4 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
 });
+

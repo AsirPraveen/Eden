@@ -1,9 +1,11 @@
 import { Ionicons } from "@expo/vector-icons";
 import { orderBy, query, Timestamp, where } from "firebase/firestore";
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import { Alert, Pressable, View } from "react-native";
 import { BarChart } from "../../../components/BarChart";
-import { Card, EmptyState, ListRow, Screen, Text } from "../../../components/base";
+import { Card, EmptyState, ListRow, Screen, Text, Button } from "../../../components/base";
+import { ClinicContextBadge } from "../../../components/ClinicContextBadge";
+import { DatePickerField } from "../../../components/DatePickerField";
 import { PermissionGate } from "../../../components/PermissionGate";
 import { useCollection } from "../../../hooks/useFirestore";
 import { medicinesCol, purchasesCol, stockCol, visitsCol } from "../../../services/paths";
@@ -88,35 +90,53 @@ function StatCard({
 export default function Reports() {
   const { colors } = useTheme();
   const { accountId, clinicId } = useSession();
-  const since = useMemo(() => {
+
+  const defaultFrom = useMemo(() => {
     const d = new Date();
     return new Date(d.getFullYear(), d.getMonth() - (MONTHS - 1), 1);
   }, []);
+  const defaultTo = useMemo(() => new Date(), []);
 
-  const { data: visits } = useCollection<Visit>(
+  const [from, setFrom] = useState(defaultFrom);
+  const [to, setTo] = useState(defaultTo);
+
+  const { data: rawVisits } = useCollection<Visit>(
     () =>
       accountId && clinicId
         ? query(
           visitsCol(accountId),
           where("clinicId", "==", clinicId),
-          where("date", ">=", Timestamp.fromDate(since)),
+          where("date", ">=", Timestamp.fromDate(from)),
           orderBy("date", "desc")
         )
         : null,
-    [accountId, clinicId, since]
+    [accountId, clinicId, from]
   );
-  const { data: purchases } = useCollection<Purchase>(
+  const { data: rawPurchases } = useCollection<Purchase>(
     () =>
       accountId && clinicId
         ? query(
           purchasesCol(accountId),
           where("clinicId", "==", clinicId),
-          where("date", ">=", Timestamp.fromDate(since)),
+          where("date", ">=", Timestamp.fromDate(from)),
           orderBy("date", "desc")
         )
         : null,
-    [accountId, clinicId, since]
+    [accountId, clinicId, from]
   );
+
+  const visits = useMemo(() => {
+    const toLimit = new Date(to);
+    toLimit.setHours(23, 59, 59, 999);
+    return rawVisits.filter((v) => v.date.toDate() <= toLimit);
+  }, [rawVisits, to]);
+
+  const purchases = useMemo(() => {
+    const toLimit = new Date(to);
+    toLimit.setHours(23, 59, 59, 999);
+    return rawPurchases.filter((p) => p.date.toDate() <= toLimit);
+  }, [rawPurchases, to]);
+
   const { data: stock } = useCollection<StockDoc>(
     () => (accountId && clinicId ? query(stockCol(accountId), where("clinicId", "==", clinicId)) : null),
     [accountId, clinicId]
@@ -126,7 +146,18 @@ export default function Reports() {
     [accountId, clinicId]
   );
 
-  const months = useMemo(() => lastMonths(MONTHS), []);
+  const months = useMemo(() => {
+    const out: string[] = [];
+    const current = new Date(from);
+    current.setDate(1);
+    const end = new Date(to);
+    end.setDate(1);
+    while (current <= end) {
+      out.push(monthKey(current));
+      current.setMonth(current.getMonth() + 1);
+    }
+    return out.slice(-12);
+  }, [from, to]);
 
   // Medicines, consultation & stock purchased per month
   const monthly = useMemo(() => {
@@ -192,6 +223,33 @@ export default function Reports() {
   return (
     <PermissionGate permission="reports">
       <Screen>
+        <ClinicContextBadge />
+
+        <View style={{ flexDirection: "row", gap: spacing.md, alignItems: "flex-end", marginBottom: spacing.md }}>
+          <DatePickerField
+            label="From"
+            value={from}
+            onChange={setFrom}
+            containerStyle={{ flex: 1, marginBottom: 0 }}
+          />
+          <DatePickerField
+            label="To"
+            value={to}
+            onChange={setTo}
+            containerStyle={{ flex: 1, marginBottom: 0 }}
+          />
+          <Button
+            title="Reset"
+            variant="ghost"
+            compact
+            onPress={() => {
+              setFrom(defaultFrom);
+              setTo(defaultTo);
+            }}
+            style={{ height: 46 }}
+          />
+        </View>
+
         {!hasData ? (
           <EmptyState
             title="No data yet"

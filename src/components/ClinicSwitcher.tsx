@@ -1,5 +1,5 @@
 import React, { useRef, useState } from "react";
-import { Modal, Pressable, StyleSheet, View } from "react-native";
+import { Dimensions, Modal, Pressable, StyleSheet, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useSession } from "../stores/useSession";
@@ -45,21 +45,27 @@ export function ClinicSwitcher({ light = false }: { light?: boolean }) {
 
       <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
         <Pressable style={StyleSheet.absoluteFill} onPress={() => setOpen(false)}>
-          {anchor && (
-            <View
-              style={[
-                styles.sheet,
-                {
-                  backgroundColor: colors.surface,
-                  borderColor: colors.border,
-                  position: "absolute",
-                  top: Math.max(insets.top + spacing.xs, anchor.y + spacing.xs),
-                  right: Math.max(spacing.lg, spacing.lg),
-                  left: Math.max(spacing.lg, anchor.x + anchor.width - DROPDOWN_WIDTH),
-                  width: DROPDOWN_WIDTH,
-                },
-              ]}
-            >
+          {anchor && (() => {
+            const screenWidth = Dimensions.get("window").width;
+            const targetLeft = anchor.x + anchor.width - DROPDOWN_WIDTH;
+            const dropdownLeft = Math.max(
+              spacing.lg,
+              Math.min(targetLeft, screenWidth - DROPDOWN_WIDTH - spacing.lg)
+            );
+            return (
+              <View
+                style={[
+                  styles.sheet,
+                  {
+                    backgroundColor: colors.surface,
+                    borderColor: colors.border,
+                    position: "absolute",
+                    top: Math.max(insets.top + spacing.xs, anchor.y + spacing.xs),
+                    left: dropdownLeft,
+                    width: DROPDOWN_WIDTH,
+                  },
+                ]}
+              >
               <Text variant="label" style={{ paddingHorizontal: spacing.lg, paddingTop: spacing.md }}>
                 Switch clinic
               </Text>
@@ -82,7 +88,8 @@ export function ClinicSwitcher({ light = false }: { light?: boolean }) {
                 </Pressable>
               ))}
             </View>
-          )}
+          );
+        })()}
         </Pressable>
       </Modal>
     </>

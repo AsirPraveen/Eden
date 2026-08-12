@@ -187,8 +187,25 @@ export default function VisitDetail() {
         ))}
       </Card>
 
+      {/* #13: Treatments section */}
+      {(visit.treatments?.length ?? 0) > 0 && (
+        <Card style={{ marginBottom: spacing.md, padding: 0 }}>
+          <Text variant="label" style={{ padding: spacing.lg, paddingBottom: spacing.sm }}>
+            Treatments
+          </Text>
+          {visit.treatments!.map((t, i) => (
+            <ListRow
+              key={i}
+              left={<IconCircle name="fitness-outline" tone="accent" size={34} />}
+              title={t.treatmentName}
+              right={formatMoney(t.price)}
+            />
+          ))}
+        </Card>
+      )}
+
       <View style={{ backgroundColor: colors.accent, borderRadius: 20, padding: spacing.lg, marginBottom: spacing.md }}>
-        {visit.consultationFee > 0 && (
+        {(visit.consultationFee > 0 || (visit.treatmentsAmount ?? 0) > 0 || (visit.discountAmount ?? 0) > 0) && (
           <>
             <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: spacing.xs }}>
               <Text variant="body" color="rgba(245,242,233,0.8)">
@@ -198,14 +215,36 @@ export default function VisitDetail() {
                 {formatMoney(visit.medicinesAmount)}
               </Text>
             </View>
-            <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: spacing.sm }}>
-              <Text variant="body" color="rgba(245,242,233,0.8)">
-                Consultation
-              </Text>
-              <Text variant="body" color="#F5F2E9">
-                {formatMoney(visit.consultationFee)}
-              </Text>
-            </View>
+            {(visit.treatmentsAmount ?? 0) > 0 && (
+              <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: spacing.xs }}>
+                <Text variant="body" color="rgba(245,242,233,0.8)">
+                  Treatments
+                </Text>
+                <Text variant="body" color="#F5F2E9">
+                  {formatMoney(visit.treatmentsAmount!)}
+                </Text>
+              </View>
+            )}
+            {visit.consultationFee > 0 && (
+              <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: spacing.xs }}>
+                <Text variant="body" color="rgba(245,242,233,0.8)">
+                  Consultation
+                </Text>
+                <Text variant="body" color="#F5F2E9">
+                  {formatMoney(visit.consultationFee)}
+                </Text>
+              </View>
+            )}
+            {(visit.discountAmount ?? 0) > 0 && (
+              <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: spacing.sm }}>
+                <Text variant="body" color="rgba(245,242,233,0.8)">
+                  Discount ({visit.discountPercent ?? 0}%)
+                </Text>
+                <Text variant="body" color="#F5F2E9">
+                  -{formatMoney(visit.discountAmount!)}
+                </Text>
+              </View>
+            )}
           </>
         )}
         <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end" }}>

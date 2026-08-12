@@ -1,5 +1,6 @@
 import Constants, { ExecutionEnvironment } from "expo-constants";
 import { Platform } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Batch, Purchase } from "../types/models";
 import { formatMoney } from "../utils/format";
 
@@ -42,7 +43,7 @@ export async function ensureNotificationPermission(): Promise<boolean> {
     });
     await Notifications.setNotificationChannelAsync("lowstock", {
       name: "Low stock",
-      importance: Notifications.AndroidImportance.HIGH,
+      importance: Notifications.AndroidImportance.DEFAULT,
     });
     await Notifications.setNotificationChannelAsync("expiry", {
       name: "Medicine expiry",
@@ -62,6 +63,8 @@ export async function scheduleDueReminders(purchase: Purchase): Promise<void> {
   if (!Notifications) return;
   const ok = await ensureNotificationPermission().catch(() => false);
   if (!ok) return;
+  const enabled = await AsyncStorage.getItem("pref:notif_payment_due").catch(() => null);
+  if (enabled === "false") return;
   const due = purchase.dueDate.toDate();
   const outstanding = purchase.totalAmount - (purchase.paidAmount || 0);
   if (outstanding <= 0) return;
@@ -116,6 +119,37 @@ export async function notifyLowStock(
   });
 }
 
+/**
+ * Fire a single summary notification for multiple low-stock medicines.
+ * Replaces the old per-medicine individual notifications.
+ */
+export async function notifyLowStockSummary(
+  count: number,
+  topNames: string[]
+): Promise<void> {
+  if (!Notifications || count === 0) return;
+  const ok = await ensureNotificationPermission().catch(() => false);
+  if (!ok) return;
+  const enabled = await AsyncStorage.getItem("pref:notif_low_stock").catch(() => null);
+  if (enabled === "false") return;
+
+  const body =
+    count === 1
+      ? `${topNames[0]} is running low — time to reorder.`
+      : `${count} medicines running low: ${topNames.slice(0, 3).join(", ")}${count > 3 ? "…" : ""}`;
+
+  await Notifications.scheduleNotificationAsync({
+    identifier: "lowstock_summary",
+    content: {
+      title: "Low stock alert",
+      body,
+      data: { kind: "lowstock_summary" },
+      ...(Platform.OS === "android" ? { channelId: "lowstock" } : {}),
+    },
+    trigger: null,
+  });
+}
+
 const LOWSTOCK_DAILY_ID = "lowstock_daily";
 
 /**
@@ -135,6 +169,8 @@ export async function scheduleDailyLowStockDigest(
   }
   const ok = await ensureNotificationPermission().catch(() => false);
   if (!ok) return;
+  const enabled = await AsyncStorage.getItem("pref:notif_low_stock").catch(() => null);
+  if (enabled === "false") return;
 
   const body =
     items.length === 1
@@ -177,6 +213,8 @@ export async function scheduleExpiryReminders(
 
   const ok = await ensureNotificationPermission().catch(() => false);
   if (!ok) return;
+  const enabled = await AsyncStorage.getItem("pref:notif_expiry").catch(() => null);
+  if (enabled === "false") return;
 
   for (const daysBefore of EXPIRY_REMINDER_DAYS) {
     const fireAt = new Date(expiryDate);

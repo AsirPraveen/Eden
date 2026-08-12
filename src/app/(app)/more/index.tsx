@@ -1,8 +1,9 @@
-import React, { useState } from "react";
-import { Alert, Pressable, View } from "react-native";
+import React, { useEffect, useState } from "react";
+import { Alert, Pressable, Switch, View } from "react-native";
 import { router, Href } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { updateDoc } from "firebase/firestore";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Avatar, Badge, Card, IconCircle, ListRow, Screen, Text } from "../../../components/base";
 import { isCloudinaryConfigured, pickAndUploadImage } from "../../../services/cloudinary";
 import { memberDoc } from "../../../services/paths";
@@ -24,6 +25,35 @@ export default function More() {
   const perms = usePermissions();
   const canManage = useCanManage();
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+
+  const [notifLowStock, setNotifLowStock] = useState(true);
+  const [notifPaymentDue, setNotifPaymentDue] = useState(true);
+  const [notifExpiry, setNotifExpiry] = useState(true);
+
+  useEffect(() => {
+    AsyncStorage.getItem("pref:notif_low_stock").then((v) => {
+      if (v !== null) setNotifLowStock(v === "true");
+    });
+    AsyncStorage.getItem("pref:notif_payment_due").then((v) => {
+      if (v !== null) setNotifPaymentDue(v === "true");
+    });
+    AsyncStorage.getItem("pref:notif_expiry").then((v) => {
+      if (v !== null) setNotifExpiry(v === "true");
+    });
+  }, []);
+
+  const toggleLowStock = async (val: boolean) => {
+    setNotifLowStock(val);
+    await AsyncStorage.setItem("pref:notif_low_stock", String(val));
+  };
+  const togglePaymentDue = async (val: boolean) => {
+    setNotifPaymentDue(val);
+    await AsyncStorage.setItem("pref:notif_payment_due", String(val));
+  };
+  const toggleExpiry = async (val: boolean) => {
+    setNotifExpiry(val);
+    await AsyncStorage.setItem("pref:notif_expiry", String(val));
+  };
 
   const changePhoto = async () => {
     if (!accountId || !member) return;
@@ -101,6 +131,50 @@ export default function More() {
               <Badge text={o.label} tone={preference === o.key ? "accent" : "neutral"} />
             </Pressable>
           ))}
+        </View>
+      </Card>
+
+      <Card style={{ marginBottom: spacing.md }}>
+        <Text variant="label" style={{ marginBottom: spacing.md }}>
+          Notification preferences
+        </Text>
+        <View style={{ gap: spacing.md }}>
+          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+            <View style={{ flex: 1 }}>
+              <Text variant="body">Low stock alerts</Text>
+              <Text variant="caption" color={colors.textSecondary}>Daily summary at 9am</Text>
+            </View>
+            <Switch
+              value={notifLowStock}
+              onValueChange={toggleLowStock}
+              trackColor={{ false: colors.border, true: colors.accentSoft }}
+              thumbColor={notifLowStock ? colors.cta : colors.surface}
+            />
+          </View>
+          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+            <View style={{ flex: 1 }}>
+              <Text variant="body">Payment due reminders</Text>
+              <Text variant="caption" color={colors.textSecondary}>Due invoice alerts</Text>
+            </View>
+            <Switch
+              value={notifPaymentDue}
+              onValueChange={togglePaymentDue}
+              trackColor={{ false: colors.border, true: colors.accentSoft }}
+              thumbColor={notifPaymentDue ? colors.cta : colors.surface}
+            />
+          </View>
+          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+            <View style={{ flex: 1 }}>
+              <Text variant="body">Expiry reminders</Text>
+              <Text variant="caption" color={colors.textSecondary}>Batch expiry alerts</Text>
+            </View>
+            <Switch
+              value={notifExpiry}
+              onValueChange={toggleExpiry}
+              trackColor={{ false: colors.border, true: colors.accentSoft }}
+              thumbColor={notifExpiry ? colors.cta : colors.surface}
+            />
+          </View>
         </View>
       </Card>
 

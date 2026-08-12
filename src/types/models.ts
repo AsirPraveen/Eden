@@ -54,6 +54,12 @@ export type Clinic = {
   printerConfig: PrinterConfig;
   active: boolean;
   createdAt: Timestamp;
+  /** Default discount % applied to prescriptions at this clinic. */
+  discountPercent?: number;
+  /** Whether prescription discount is enabled for this clinic. */
+  discountEnabled?: boolean;
+  /** Custom medicine form types added by this clinic. */
+  customForms?: string[];
 };
 
 export type Supplier = {
@@ -71,11 +77,13 @@ export type MedicineForm =
   | "tablet"
   | "capsule"
   | "syrup"
-  | "injection"
+  | "softgel"
+  | "soap"
   | "drops"
   | "ointment"
   | "powder"
-  | "other";
+  | "other"
+  | (string & {}); // allows custom form types
 
 export type Medicine = {
   id: string;
@@ -142,6 +150,10 @@ export type Purchase = {
   status: PurchaseStatus;
   createdBy: string;
   createdAt: Timestamp;
+  /** Total including GST from supplier invoice. */
+  invoiceTotal?: number;
+  /** Computed: invoiceTotal - totalAmount. */
+  gstAmount?: number;
 };
 
 export type Patient = {
@@ -166,6 +178,13 @@ export type VisitItem = {
   price: number; // per unit selling price
 };
 
+/** Service-based treatment applied during a visit (no stock tracking). */
+export type VisitTreatment = {
+  treatmentId: string;
+  treatmentName: string;
+  price: number; // editable per-visit
+};
+
 export type Visit = {
   id: string;
   clinicId: string;
@@ -180,6 +199,27 @@ export type Visit = {
   paymentMode: "cash" | "upi" | "card" | "unpaid";
   printedAt: Timestamp | null;
   createdBy: string;
+  /** Treatments applied during this visit. */
+  treatments?: VisitTreatment[];
+  /** Sum of treatment prices. */
+  treatmentsAmount?: number;
+  /** Discount % applied to this prescription. */
+  discountPercent?: number;
+  /** Computed discount amount. */
+  discountAmount?: number;
+};
+
+/**
+ * A reusable treatment definition. Service-based — no stock tracking.
+ * Persisted in Firestore at accounts/{accountId}/treatments.
+ */
+export type Treatment = {
+  id: string;
+  clinicId: string;
+  name: string;
+  defaultPrice: number;
+  active: boolean;
+  createdAt: Timestamp;
 };
 
 export type LedgerType = "purchase" | "sale" | "adjustment" | "payment";

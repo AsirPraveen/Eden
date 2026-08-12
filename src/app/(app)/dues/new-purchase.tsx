@@ -9,6 +9,7 @@ import { MonthPickerField } from "../../../components/MonthPickerField";
 import { PermissionGate } from "../../../components/PermissionGate";
 import { AddItemButton, PickerRow } from "../../../components/PickerRow";
 import { PickerModal } from "../../../components/PickerModal";
+import { ClinicContextBadge } from "../../../components/ClinicContextBadge";
 import { useCollection } from "../../../hooks/useFirestore";
 import { scheduleDueReminders } from "../../../services/notifications";
 import { medicinesCol, purchaseDoc, purchasesCol, suppliersCol } from "../../../services/paths";
@@ -75,6 +76,8 @@ export default function NewPurchase() {
   const [paidNow, setPaidNow] = useState("");
   const [items, setItems] = useState<DraftItem[]>([]);
   const [busy, setBusy] = useState(false);
+  const [showGst, setShowGst] = useState(false);
+  const [invoiceTotal, setInvoiceTotal] = useState("");
 
   const [supplierPickerOpen, setSupplierPickerOpen] = useState(false);
   const [medicinePickerOpen, setMedicinePickerOpen] = useState(false);
@@ -140,6 +143,8 @@ export default function NewPurchase() {
     setBusy(true);
     try {
       const days = parseInt(creditDays, 10) || 0;
+      const parsedInvoiceTotal = showGst && invoiceTotal ? parseFloat(invoiceTotal) || 0 : undefined;
+      const gstAmt = parsedInvoiceTotal !== undefined ? Math.max(0, parsedInvoiceTotal - total) : undefined;
       const purchaseId = await recordPurchase({
         accountId,
         clinicId,
@@ -152,6 +157,8 @@ export default function NewPurchase() {
         dueDate,
         paidNow: parseFloat(paidNow) || 0,
         byUid: user.uid,
+        invoiceTotal: parsedInvoiceTotal,
+        gstAmount: gstAmt,
       });
       const snap = await getDoc(purchaseDoc(accountId, purchaseId));
       if (snap.exists()) {
@@ -168,6 +175,7 @@ export default function NewPurchase() {
   return (
     <PermissionGate permission="purchase">
       <Screen keyboardOffset={44}>
+        <ClinicContextBadge />
         <PickerRow
           icon="business-outline"
           label="Supplier (rep / company)"
@@ -270,6 +278,40 @@ export default function NewPurchase() {
             <Text variant="body">Total</Text>
             <Text variant="subheading">{formatMoney(total)}</Text>
           </View>
+
+          <Pressable
+            onPress={() => setShowGst(!showGst)}
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: spacing.xs,
+              marginTop: spacing.md,
+              marginBottom: showGst ? spacing.sm : 0,
+            }}
+          >
+            <Ionicons name={showGst ? "chevron-down" : "chevron-forward"} size={16} color={colors.accent} />
+            <Text variant="caption" color={colors.accent} style={{ fontWeight: "600" }}>
+              Add GST from invoice
+            </Text>
+          </Pressable>
+
+          {showGst && (
+            <View style={{ gap: spacing.xs, marginBottom: spacing.md }}>
+              <Input
+                label="Invoice total (incl. GST) ₹"
+                value={invoiceTotal}
+                onChangeText={setInvoiceTotal}
+                keyboardType="decimal-pad"
+                containerStyle={{ marginBottom: spacing.xs }}
+              />
+              {invoiceTotal ? (
+                <Text variant="caption" color={colors.accent} style={{ fontWeight: "600" }}>
+                  GST Amount: {formatMoney(Math.max(0, (parseFloat(invoiceTotal) || 0) - total))}
+                </Text>
+              ) : null}
+            </View>
+          )}
+
           <Input
             label="Paid now (leave empty if fully on credit)"
             value={paidNow}
